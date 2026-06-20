@@ -1,0 +1,82 @@
+════════════════════════════════════════════════════════════
+  PICTOOL — Quran Screenshot Organizer
+  Instructions for both users
+════════════════════════════════════════════════════════════
+
+SETUP (do this once)
+────────────────────
+1. Put the "pictool" folder in your shared Google Drive.
+   Both people must install Google Drive desktop app so the
+   folder syncs automatically on both computers.
+
+2. Put all your screenshot images directly inside the
+   "pictool" folder (or any subfolder — just make sure you
+   select the right folder in the app).
+
+3. Open "index.html" in Chrome or Microsoft Edge.
+   (Double-click the file — it opens in your browser.)
+
+4. Click "Open Images Folder" and select the "pictool"
+   folder from Google Drive.
+   The app will remember this folder next time you open it.
+
+
+DAILY USE
+─────────
+• Open index.html in Chrome or Edge.
+• The app loads your images automatically.
+• Click any image to tag it.
+
+
+TAGGING AN IMAGE (click on it)
+───────────────────────────────
+• Surahs: click the surah box and search by name or number.
+  You can add multiple surahs to one image.
+  Click × on a tag to remove it.
+
+• Status:
+  - Not started  = no one has worked on it yet
+  - Partially done = one person finished their part,
+                     the other person still needs to work on it
+  - Done = both people have finished with this image
+
+• Notes: write anything helpful, e.g.:
+  "Person 1 done (Al-Baqara). Person 2 still needs to check."
+
+• Click SAVE when done.
+
+
+FILTERING
+─────────
+• Click "Surah:" dropdown to show only images that contain
+  a specific surah (or multiple surahs).
+• Use "Status:" to show only Partially done images, etc.
+• Click "Clear filters" to go back to all images.
+
+
+ADDING NEW IMAGES
+─────────────────
+Drop new screenshots into the pictool folder in Google Drive.
+Then click "↻ Refresh" in the app to see them.
+
+
+SYNCING BETWEEN TWO PEOPLE
+───────────────────────────
+The app saves all tags in a file called "data.json" in the
+pictool folder. Google Drive syncs this file automatically.
+
+Wait a few seconds after saving before the other person
+opens the app (to let Google Drive sync). Click "↻ Refresh"
+to load the latest tags saved by the other person.
+
+TIP: Avoid both people editing the same image at exactly
+the same time — this could cause one person's save to
+overwrite the other's. Work on different images at once.
+
+
+BROWSER REQUIREMENT
+───────────────────
+Chrome or Microsoft Edge only.
+Does NOT work in Firefox or Internet Explorer.
+
+════════════════════════════════════════════════════════════
