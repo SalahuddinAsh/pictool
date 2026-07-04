@@ -16,14 +16,16 @@
   --primary:     #2563eb;
   --primary-h:   #1d4ed8;
   --primary-lt:  #eff6ff;
-  --s-none:      #9ca3af;
-  --s-partial:   #f59e0b;
-  --s-done:      #10b981;
-  --s-improve:   #ef4444;
-  --s-none-bg:   #f9fafb;
-  --s-partial-bg:#fffbeb;
-  --s-done-bg:   #f0fdf4;
-  --s-improve-bg:#fef2f2;
+  --s-none:       #9ca3af;
+  --s-partial:    #f59e0b;
+  --s-done:       #10b981;
+  --s-improve:    #ef4444;
+  --s-repeated:   #8b5cf6;
+  --s-none-bg:    #f9fafb;
+  --s-partial-bg: #fffbeb;
+  --s-done-bg:    #f0fdf4;
+  --s-improve-bg: #fef2f2;
+  --s-repeated-bg:#f5f3ff;
   --card-w:      220px;
 }
 
@@ -68,13 +70,19 @@ body {
   padding: 9px 18px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
   position: sticky;
   top: 52px;
   z-index: 49;
 }
 .filter-label { font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.fname-search { height: 30px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface2); color: var(--text); font-size: 12px; font-family: inherit; outline: none; width: 160px; }
+.fname-search:focus { border-color: var(--primary); }
+.filter-sep { width: 1px; height: 22px; background: var(--border); flex-shrink: 0; margin: 0 3px; }
+.user-filter-btns { display: flex; gap: 4px; }
+.uf-btn { min-width: 26px; height: 26px; border-radius: 13px; padding: 0 8px; border: 2px solid transparent; cursor: pointer; font-size: 11px; font-weight: 700; white-space: nowrap; background: #e2e8f0; color: #9ca3af; transition: all .15s; font-family: inherit; }
+.uf-btn.active { color: #fff; }
 
 /* size slider */
 .size-ctrl { display: flex; align-items: center; gap: 6px; }
@@ -207,6 +215,7 @@ select:focus { border-color: var(--primary); }
 .card.s-partial  { border-color: var(--s-partial);  }
 .card.s-done     { border-color: var(--s-done);     }
 .card.s-improve  { border-color: var(--s-improve);  }
+.card.s-repeated { border-color: var(--s-repeated); }
 
 /* Full image display — no cropping */
 .card-img-wrap {
@@ -215,7 +224,17 @@ select:focus { border-color: var(--primary); }
   display: flex; align-items: center; justify-content: center;
   overflow: hidden;
   flex-shrink: 0;
+  position: relative;
 }
+.card-copy-btn {
+  position: absolute; bottom: 5px; left: 5px;
+  width: 26px; height: 26px; border-radius: 6px;
+  background: rgba(0,0,0,.5); border: none; cursor: pointer;
+  color: #fff; font-size: 13px; display: flex; align-items: center; justify-content: center;
+  opacity: 0.3; transition: opacity .15s; z-index: 2;
+}
+.card:hover .card-copy-btn { opacity: 1; }
+.card-copy-btn:hover { background: rgba(0,0,0,.8); }
 .card-img-wrap img {
   width: 100%; height: auto;
   display: block; object-fit: contain;
@@ -232,9 +251,10 @@ select:focus { border-color: var(--primary); }
   font-size: 10px; font-weight: 700;
   color: #fff; letter-spacing: .2px;
 }
-.badge-partial { background: var(--s-partial); }
-.badge-done    { background: var(--s-done);    }
-.badge-improve { background: var(--s-improve); }
+.badge-partial  { background: var(--s-partial);  }
+.badge-done     { background: var(--s-done);     }
+.badge-improve  { background: var(--s-improve);  }
+.badge-repeated { background: var(--s-repeated); }
 
 .card-body { padding: 9px 10px; }
 .card-name {
@@ -319,10 +339,11 @@ select:focus { border-color: var(--primary); }
   background: none; text-align: right; width: 100%;
 }
 .status-opt:hover { border-color: #ccc; }
-.status-opt.sel-none    { border-color: var(--s-none);    background: var(--s-none-bg);    }
-.status-opt.sel-partial { border-color: var(--s-partial); background: var(--s-partial-bg); }
-.status-opt.sel-done    { border-color: var(--s-done);    background: var(--s-done-bg);    }
-.status-opt.sel-improve { border-color: var(--s-improve); background: var(--s-improve-bg); }
+.status-opt.sel-none     { border-color: var(--s-none);     background: var(--s-none-bg);     }
+.status-opt.sel-partial  { border-color: var(--s-partial);  background: var(--s-partial-bg);  }
+.status-opt.sel-done     { border-color: var(--s-done);     background: var(--s-done-bg);     }
+.status-opt.sel-improve  { border-color: var(--s-improve);  background: var(--s-improve-bg);  }
+.status-opt.sel-repeated { border-color: var(--s-repeated); background: var(--s-repeated-bg); }
 .status-ind { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
 
 textarea {
@@ -380,7 +401,7 @@ input[type=range].pen-size {
 }
 
 .editor-body {
-  flex: 1; overflow: auto;
+  flex: 1; overflow: auto; min-height: 0;
   display: flex; align-items: center; justify-content: center;
   padding: 16px; position: relative;
 }
@@ -456,53 +477,6 @@ input[type=range].pen-size {
 /* long-press ripple hint */
 .card.lp-active { outline: 3px solid var(--primary); outline-offset: 2px; }
 
-/* ── CLICK MODE ─────────────────────── */
-.cm-bar {
-  display: flex; align-items: center; gap: 8px;
-  padding: 4px 10px; border-radius: 8px;
-  background: #1d4ed8; color: #fff;
-  font-size: 13px; font-weight: 600;
-}
-.cm-pulse {
-  width: 9px; height: 9px; border-radius: 50%;
-  background: #fff; flex-shrink: 0;
-  animation: cmPulse 1.1s ease-in-out infinite;
-}
-@keyframes cmPulse { 0%,100%{opacity:1} 50%{opacity:.3} }
-.cm-bar button {
-  background: rgba(255,255,255,.2); border: none; color: #fff;
-  cursor: pointer; border-radius: 5px; padding: 2px 8px; font-size: 13px;
-}
-.cm-bar button:hover { background: rgba(255,255,255,.35); }
-.grid.cm-active .card { cursor: cell; }
-.grid.cm-active .card:hover {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(37,99,235,.18);
-}
-.card.cm-selected {
-  border-color: var(--primary) !important;
-  box-shadow: 0 0 0 4px rgba(37,99,235,.28) !important;
-}
-.card.cm-selected::before {
-  content: '✓';
-  position: absolute; top: 7px; left: 7px; z-index: 5;
-  width: 22px; height: 22px; border-radius: 50%;
-  background: var(--primary); color: #fff;
-  font-size: 13px; font-weight: 700;
-  display: flex; align-items: center; justify-content: center;
-}
-.cm-save-btn {
-  background: rgba(255,255,255,.15);
-  border: 1px solid rgba(255,255,255,.3);
-  color: #fff; cursor: pointer; border-radius: 6px;
-  padding: 3px 12px; font-size: 13px; font-weight: 600;
-  transition: background .12s; opacity: .45; pointer-events: none;
-}
-.cm-save-btn.ready {
-  background: #10b981; border-color: #10b981;
-  opacity: 1; pointer-events: auto;
-}
-.cm-save-btn.ready:hover { background: #059669; }
 
 /* ── CONTEXT MENU ───────────────────── */
 .ctx-menu {
@@ -528,29 +502,6 @@ input[type=range].pen-size {
 }
 .chip-x:hover { opacity: 1; color: var(--s-improve); }
 
-/* ── DELETE MODE ────────────────────── */
-.card.del-selected {
-  border-color: var(--s-improve) !important;
-  box-shadow: 0 0 0 4px rgba(239,68,68,.25) !important;
-}
-.card.del-selected::before {
-  content: '🗑'; position: absolute; top: 7px; left: 7px; z-index: 5;
-  width: 22px; height: 22px; border-radius: 50%;
-  background: var(--s-improve); color: #fff;
-  font-size: 11px;
-  display: flex; align-items: center; justify-content: center;
-}
-.del-bar { background: #b91c1c; }
-.del-save-btn {
-  background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.4);
-  color: #fff; cursor: pointer; border-radius: 6px;
-  padding: 3px 12px; font-size: 13px; font-weight: 600;
-  transition: background .12s; opacity: .45; pointer-events: none;
-}
-.del-save-btn.ready { background: #fff; color: #b91c1c; opacity: 1; pointer-events: auto; }
-.del-save-btn.ready:hover { background: #fee2e2; }
-.grid.del-active .card { cursor: crosshair; }
-.grid.del-active .card:hover { border-color: var(--s-improve); box-shadow: 0 0 0 3px rgba(239,68,68,.18); }
 
 @media (max-width: 640px) {
   .modal-body { flex-direction: column; }
@@ -587,6 +538,7 @@ input[type=range].pen-size {
 .stats-card.sc-done    { background: var(--s-done-bg);    border: 1px solid var(--s-done);    }
 .stats-card.sc-partial { background: var(--s-partial-bg); border: 1px solid var(--s-partial); }
 .stats-card.sc-improve { background: var(--s-improve-bg); border: 1px solid var(--s-improve); }
+.stats-card.sc-repeated{ background: var(--s-repeated-bg);border: 1px solid var(--s-repeated);}
 .stats-card.sc-none    { background: var(--s-none-bg);    border: 1px solid var(--s-none);    }
 .stats-card.sc-total   { background: var(--primary-lt);   border: 1px solid #bfdbfe; }
 .stats-card-num   { font-size: 30px; font-weight: 700; line-height: 1; }
@@ -619,6 +571,38 @@ input[type=range].pen-size {
   overflow: hidden;
 }
 
+/* ── DETAILED STATS ─────────────────────── */
+.dstats-table-wrap { overflow-x: auto; }
+.dstats-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.dstats-table th {
+  text-align: start; padding: 8px 10px; font-size: 11px; font-weight: 700;
+  color: var(--muted); text-transform: uppercase; letter-spacing: .3px;
+  border-bottom: 2px solid var(--border); position: sticky; top: 0; background: var(--surface);
+}
+.dstats-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); }
+.dstats-table tbody tr { cursor: pointer; transition: background .1s; }
+.dstats-table tbody tr:hover { background: var(--bg); }
+.dstats-table td.num { text-align: center; font-variant-numeric: tabular-nums; }
+.dstats-table tr.dstats-total-row { cursor: default; background: var(--primary-lt); }
+.dstats-table tr.dstats-total-row:hover { background: var(--primary-lt); }
+.dstats-table tr.dstats-total-row td { border-bottom: 2px solid var(--border); }
+.dstats-empty { color: var(--muted); font-size: 13px; text-align: center; padding: 20px 0; }
+.dstats-groups-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.dstats-group-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+.dstats-group-title { font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+.dstats-group-surahs { display: flex; flex-wrap: wrap; gap: 4px; }
+.dstats-overlap-note { font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+
+/* ── MANAGE TAGS ─────────────────────────── */
+.tag-manage-list { display: flex; flex-direction: column; gap: 6px; }
+.tag-manage-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg);
+}
+.tag-color-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+.tag-manage-label { flex: 1; font-size: 13px; font-weight: 600; }
+.tag-manage-builtin { font-size: 11px; color: var(--muted); }
+
 /* ── VIEW MODE ─────────────────────────── */
 .view-overlay {
   position: fixed; inset: 0; background: #0d0d0d;
@@ -628,6 +612,7 @@ input[type=range].pen-size {
   display: flex; align-items: center; gap: 10px;
   padding: 8px 14px; background: rgba(0,0,0,.55);
   flex-shrink: 0; min-height: 48px;
+  direction: ltr; /* keep filename on the left regardless of page RTL */
 }
 .view-hdr-btn {
   background: rgba(255,255,255,.1); border: none; color: #e2e8f0;
@@ -660,26 +645,29 @@ input[type=range].pen-size {
 .view-nav-btn:disabled { opacity: .15; pointer-events: none; }
 .view-prev-btn { left: 8px; }
 .view-next-btn { right: 8px; }
+.review-bar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 18px; background: #0f172a; border-bottom: 1px solid #1e293b; flex-shrink: 0;
+}
+.review-progress-track {
+  flex: 1; height: 8px; background: #1e293b; border-radius: 4px; overflow: hidden;
+}
+.review-progress-fill {
+  height: 100%; background: #10b981; border-radius: 4px; transition: width .3s ease; width: 0%;
+}
+.review-progress-text { font-size: 12px; color: #94a3b8; white-space: nowrap; }
+.review-exit-btn {
+  font-size: 12px; color: #94a3b8; background: none; border: 1px solid #334155;
+  border-radius: 6px; padding: 3px 10px; cursor: pointer; white-space: nowrap;
+}
+.review-exit-btn:hover { color: #e2e8f0; border-color: #94a3b8; }
 
-.view-meta {
-  flex-shrink: 0; padding: 5px 14px; display: flex; flex-direction: column; gap: 5px;
-}
-.view-note-text {
-  font-size: 12px; color: #94a3b8; font-style: italic;
-  background: rgba(255,255,255,.05); border-radius: 6px; padding: 6px 10px; direction: rtl;
-}
-.view-surahs-row { display: flex; flex-wrap: wrap; gap: 4px; }
-.view-surah-chip {
-  background: rgba(37,99,235,.3); color: #93c5fd;
-  border: 1px solid rgba(37,99,235,.4);
-  padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500;
-}
-
-.view-tag-bar {
-  flex-shrink: 0; padding: 5px 8px;
+.view-controls-row {
+  display: flex; align-items: center; gap: 7px;
+  padding: 6px 8px; flex-shrink: 0;
   background: rgba(0,0,0,.55);
-  position: relative;
 }
+.view-tag-area { flex: 1; position: relative; min-width: 0; }
 .view-tag-wrap {
   border: 1px solid #374151; border-radius: 8px;
   background: #111827; padding: 5px 8px;
@@ -695,96 +683,12 @@ input[type=range].pen-size {
 }
 .view-tag-input::placeholder { color: #374151; }
 .view-sug-drop {
-  position: absolute; bottom: calc(100% + 2px); left: 8px; right: 8px;
+  position: absolute; bottom: calc(100% + 2px); left: 0; right: 0;
   background: #0f172a; border: 1px solid #1e293b;
   border-radius: 10px; max-height: 230px; overflow-y: auto;
   z-index: 20; box-shadow: 0 -8px 28px rgba(0,0,0,.6);
 }
 
-.view-actions {
-  flex-shrink: 0; background: rgba(0,0,0,.65);
-  display: flex; align-items: stretch; padding: 6px 8px; gap: 4px;
-  border-top: 1px solid rgba(255,255,255,.07);
-}
-.view-act-btn {
-  flex: 1; display: flex; flex-direction: column; align-items: center;
-  justify-content: center; gap: 3px;
-  background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.1);
-  color: #e2e8f0; cursor: pointer; border-radius: 8px;
-  padding: 8px 2px; font-family: inherit; transition: background .12s; min-width: 0;
-}
-.view-act-btn:hover { background: rgba(255,255,255,.15); }
-.view-act-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
-.view-act-btn.va-danger { color: #fca5a5; border-color: rgba(239,68,68,.3); }
-.view-act-btn.va-danger:hover { background: rgba(239,68,68,.2); }
-.va-icon { font-size: 17px; line-height: 1; }
-.va-label { font-size: 10px; white-space: nowrap; }
-
-.view-panel {
-  position: absolute; bottom: 0; left: 0; right: 0;
-  background: #1e2433; border-top: 1px solid #2d3748;
-  border-radius: 16px 16px 0 0;
-  max-height: 68vh; display: flex; flex-direction: column; z-index: 10;
-  animation: vpSlideUp .18s ease;
-}
-@keyframes vpSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-.vp-header {
-  display: flex; align-items: center; gap: 10px;
-  padding: 12px 16px; border-bottom: 1px solid #2d3748; flex-shrink: 0;
-}
-.vp-title { flex: 1; font-size: 14px; font-weight: 600; color: #e2e8f0; }
-.vp-close {
-  background: rgba(255,255,255,.08); border: none; color: #94a3b8;
-  width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 13px;
-  display: flex; align-items: center; justify-content: center;
-}
-.vp-close:hover { background: rgba(255,255,255,.16); color: #fff; }
-.vp-body { flex: 1; overflow-y: auto; padding: 14px 16px; }
-.vp-footer {
-  padding: 10px 16px; border-top: 1px solid #2d3748;
-  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
-}
-.vp-count { font-size: 12px; color: #64748b; margin-inline-start: auto; }
-
-.vp-search-wrap { margin-bottom: 10px; }
-.vp-search {
-  width: 100%; padding: 7px 11px; border: 1px solid #374151;
-  border-radius: 8px; background: #111827; color: #e2e8f0;
-  font-size: 13px; outline: none; font-family: inherit; direction: rtl;
-}
-.vp-search:focus { border-color: var(--primary); }
-.vp-surah-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 5px;
-}
-.vp-tile {
-  padding: 5px 3px; border: 2px solid #374151; border-radius: 7px;
-  cursor: pointer; text-align: center; transition: all .1s; user-select: none;
-}
-.vp-tile:hover { border-color: var(--primary); }
-.vp-tile.sel   { border-color: var(--primary); background: var(--primary); }
-.vp-tile .sg-num { display: block; font-size: 10px; color: #64748b; line-height: 1.2; }
-.vp-tile.sel .sg-num { color: rgba(255,255,255,.65); }
-.vp-tile .sg-name { display: block; font-size: 11px; font-weight: 600; color: #e2e8f0; margin-top: 1px; }
-.vp-tile.sel .sg-name { color: #fff; }
-
-.vp-note-ta {
-  width: 100%; min-height: 110px; padding: 9px 11px;
-  border: 1px solid #374151; border-radius: 8px;
-  background: #111827; color: #e2e8f0;
-  font-size: 13px; font-family: inherit; resize: vertical; outline: none;
-  direction: rtl; line-height: 1.5;
-}
-.vp-note-ta:focus { border-color: var(--primary); }
-
-/* ── TAG INPUT (surahs panel) ───────────────── */
-.vp-tag-input-wrap {
-  border: 1px solid #374151; border-radius: 8px;
-  background: #111827; padding: 6px 8px;
-  display: flex; flex-wrap: wrap; gap: 5px;
-  cursor: text; min-height: 44px; align-items: center;
-  transition: border-color .12s;
-}
-.vp-tag-input-wrap:focus-within { border-color: var(--primary); }
 .vp-surah-chip-dark {
   display: inline-flex; align-items: center; gap: 3px;
   background: var(--primary); color: #fff;
@@ -795,16 +699,6 @@ input[type=range].pen-size {
   cursor: pointer; opacity: .7; font-size: 14px; line-height: 1; padding: 0 1px;
 }
 .vp-chip-x:hover { opacity: 1; }
-.vp-tag-input {
-  border: none; background: transparent; color: #e2e8f0;
-  font-size: 13px; font-family: inherit; outline: none;
-  flex: 1; min-width: 100px; direction: rtl; padding: 2px 0;
-}
-.vp-tag-input::placeholder { color: #475569; }
-.vp-sug-list {
-  overflow-y: auto; max-height: 195px; margin-top: 8px;
-  border-radius: 8px; border: 1px solid #1e293b; background: #0f172a;
-}
 .vp-sug-item {
   display: flex; align-items: center; gap: 9px;
   padding: 8px 12px; cursor: pointer; font-size: 13px; color: #e2e8f0;
@@ -816,33 +710,108 @@ input[type=range].pen-size {
 .vp-sug-num { font-size: 11px; color: #475569; width: 24px; flex-shrink: 0; direction: ltr; text-align: right; }
 .vp-sug-check { margin-inline-start: auto; color: var(--s-done); font-size: 12px; flex-shrink: 0; }
 
-.vp-flags-body .form-label { color: #94a3b8; }
-.vp-flags-body .status-opt { color: #e2e8f0; border-color: #374151; background: transparent; }
+.view-status-btns { display: flex; gap: 5px; flex-shrink: 0; flex-wrap: wrap; }
+.view-note-bar { padding: 3px 8px 6px; background: rgba(0,0,0,.55); display: flex; gap: 8px; align-items: flex-start; }
+.view-units-wrap { display: flex; flex-direction: column; gap: 3px; flex-shrink: 0; }
+.view-units-label { font-size: 10px; color: #64748b; }
+.view-units-input { width: 64px; padding: 4px 7px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12); border-radius: 6px; color: #e2e8f0; font-size: 13px; font-family: inherit; outline: none; text-align: center; }
+.view-units-input:focus { border-color: #475569; background: #0f172a; }
+.units-stat-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.units-stat-card { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface2); min-width: 80px; }
+.units-stat-num { font-size: 24px; font-weight: 700; line-height: 1; }
+.units-stat-label { font-size: 11px; color: var(--muted); }
+.view-note-input {
+  width: 100%; background: #1e293b; border: 1px solid #334155;
+  border-radius: 8px; color: #e2e8f0; font-size: 13px;
+  padding: 6px 12px; font-family: inherit; direction: rtl;
+  box-sizing: border-box; resize: none; overflow: hidden;
+  line-height: 1.5; min-height: 34px;
+}
+.view-note-input::placeholder { color: #475569; }
+.view-note-input:focus { outline: none; border-color: #475569; background: #0f172a; }
+.vsb {
+  font-size: 12px; font-weight: 600; padding: 5px 10px;
+  border-radius: 20px; border: 1.5px solid #334155;
+  background: transparent; color: #64748b; cursor: pointer;
+  transition: all .12s; white-space: nowrap; font-family: inherit;
+}
+.vsb:hover { border-color: #64748b; color: #cbd5e1; }
+.vsb.vsb-active-none     { border-color: #9ca3af; background: rgba(156,163,175,.15); color: #9ca3af; }
+.vsb.vsb-active-partial  { border-color: #f59e0b; background: rgba(245,158,11,.15); color: #f59e0b; }
+.vsb.vsb-active-done     { border-color: #10b981; background: rgba(16,185,129,.15); color: #10b981; }
+.vsb.vsb-active-improve  { border-color: #ef4444; background: rgba(239,68,68,.15); color: #ef4444; }
+.vsb.vsb-active-repeated { border-color: #8b5cf6; background: rgba(139,92,246,.15); color: #8b5cf6; }
+.view-icon-btn {
+  width: 34px; height: 34px; border-radius: 8px;
+  border: 1px solid #334155; background: transparent;
+  color: #64748b; cursor: pointer; font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: all .12s;
+}
+.view-icon-btn:hover { background: rgba(255,255,255,.08); color: #e2e8f0; }
+.view-icon-btn.va-danger { border-color: rgba(239,68,68,.25); color: #f87171; }
+.view-icon-btn.va-danger:hover { background: rgba(239,68,68,.12); }
 
-.vp-filter-row { display: flex; flex-direction: column; gap: 14px; }
-.vp-filter-group { display: flex; flex-direction: column; gap: 7px; }
-.vp-filter-label { font-size: 12px; font-weight: 600; color: #94a3b8; }
-.vp-status-opts { display: flex; flex-wrap: wrap; gap: 6px; }
-.vp-status-opt {
-  padding: 5px 12px; border-radius: 20px; border: 1px solid #374151;
-  cursor: pointer; font-size: 12px; background: transparent; color: #94a3b8; font-family: inherit;
-  transition: all .1s;
+/* ── MULTI-USER ─────────────────────────── */
+.user-sel { display: flex; gap: 5px; align-items: center; }
+.user-btn {
+  min-width: 28px; height: 28px; border-radius: 14px;
+  padding: 0 9px; border: 2px solid transparent; cursor: pointer;
+  font-size: 12px; font-weight: 700; white-space: nowrap;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .15s; flex-shrink: 0; font-family: inherit;
+  background: #e2e8f0; color: #9ca3af;
 }
-.vp-status-opt.active { background: var(--primary); border-color: var(--primary); color: #fff; }
-.vp-filter-checks { display: flex; flex-direction: column; gap: 8px; }
-.vp-filter-check {
-  display: flex; align-items: center; gap: 8px; font-size: 13px; color: #cbd5e1; cursor: pointer;
+.user-btn:hover { background: #d1d5db; color: #6b7280; }
+.user-btn.active { color: #fff; box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px currentColor; }
+.user-sep { width: 1px; height: 22px; background: var(--border); flex-shrink: 0; margin: 0 6px; }
+
+.card-users { display: flex; gap: 4px; margin-top: 5px; flex-wrap: wrap; }
+.user-chip {
+  font-size: 10px; font-weight: 600; padding: 2px 6px;
+  border-radius: 4px; color: #fff; line-height: 1.5;
+  display: flex; align-items: center; gap: 4px;
 }
-.vp-filter-check input { accent-color: var(--primary); }
+.user-chip-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+.vm-other-bar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 4px 10px; background: rgba(0,0,0,.45);
+  border-top: 1px solid rgba(255,255,255,.05); flex-shrink: 0;
+}
+.vm-user-status-item { display: flex; align-items: center; gap: 5px; font-size: 11px; }
+.vm-user-initial {
+  font-size: 10px; font-weight: 700; width: 17px; height: 17px;
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  color: #fff; flex-shrink: 0;
+}
+.vm-user-note-bar {
+  padding: 3px 10px 5px; background: rgba(0,0,0,.40);
+  border-top: 1px solid rgba(255,255,255,.04); flex-shrink: 0;
+}
+.vm-user-note-row {
+  display: flex; gap: 7px; font-size: 11px; color: #64748b; line-height: 1.5; margin-top: 2px;
+}
+.vm-user-note-label { font-weight: 700; flex-shrink: 0; }
 </style>
 </head>
 <body>
 
 <!-- ── HEADER ── -->
 <div id="appHeader" class="header hidden">
-  <span class="logo">📖 بيكتول</span>
+  <span class="logo">📖 بيكتول <span style="font-size:14px;font-weight:400;opacity:.5;letter-spacing:.02em">v2.8</span></span>
+  <span style="font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap">المستخدم الحالي:</span>
+  <div class="user-sel" id="userSel">
+    <button class="user-btn" id="uBtn-a" onclick="switchUser('a')">A</button>
+    <button class="user-btn" id="uBtn-b" onclick="switchUser('b')">Z</button>
+    <button class="user-btn" id="uBtn-c" onclick="switchUser('c')">S</button>
+  </div>
+  <span class="user-sep"></span>
   <div class="header-actions">
     <button class="btn btn-ghost" onclick="openStats()">📊 إحصائيات</button>
+    <button class="btn btn-ghost" onclick="openDetailedStats()">📈 إحصائيات تفصيلية</button>
+    <button class="btn btn-ghost" onclick="openManageTags()">🏷 إدارة الوسوم</button>
+    <button class="btn btn-ghost" id="reviewBtn" onclick="startReview()">🔍 مراجعة</button>
     <button class="btn btn-ghost" onclick="refreshImages()">↻ تحديث</button>
     <button class="btn btn-ghost" onclick="openFolder()">تغيير المجلد</button>
   </div>
@@ -865,50 +834,46 @@ input[type=range].pen-size {
     </div>
   </div>
 
-  <span class="filter-label">الحالة:</span>
-  <select id="fStatus" onchange="applyFilters()">
-    <option value="all">الكل</option>
-    <option value="none">لم يُبدأ</option>
-    <option value="partial">منجز جزئياً</option>
-    <option value="done">منجز</option>
-    <option value="improve">يحتاج تحسين</option>
-  </select>
-
   <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;white-space:nowrap">
-    <input type="checkbox" id="fUntagged" onchange="applyFilters()">
-    <span style="font-weight:600;color:var(--muted)">غير موسومة فقط</span>
+    <input type="checkbox" id="fExactSurahs" onchange="applyFilters()">
+    <span style="font-weight:600;color:var(--muted)">السور المحددة فقط</span>
   </label>
 
-  <span class="filter-label" style="margin-inline-start:8px">الحجم:</span>
+  <span class="filter-sep"></span>
+
+  <span class="filter-label">الحالة:</span>
+  <select id="fStatus" onchange="applyFilters()"></select>
+
+  <span class="filter-sep"></span>
+
+  <span class="filter-label">تصفية صور موسومة من:</span>
+  <div class="user-filter-btns" id="userFilterBtns"></div>
+
+  <span class="filter-sep"></span>
+
+  <span class="filter-label">الوسوم:</span>
+  <select id="fTagCount" onchange="applyFilters()">
+    <option value="">الكل</option>
+    <option value="0">غير موسومة</option>
+    <option value="1">سورة واحدة</option>
+    <option value="2">سورتان</option>
+  </select>
+
+  <span class="filter-sep"></span>
+
+  <span class="filter-label">الحجم:</span>
   <div class="size-ctrl">
     <button class="size-btn" onclick="adjustSize(-30)" title="تصغير">−</button>
     <input class="size-slider" type="range" id="sizeSlider" min="120" max="1200" value="220" oninput="onSizeChange(this.value)">
     <button class="size-btn" onclick="adjustSize(30)" title="تكبير">+</button>
   </div>
 
-  <span style="width:1px;height:22px;background:var(--border);flex-shrink:0"></span>
-  <span class="filter-label">لصق سورة:</span>
-  <select id="cmSelect" onchange="setClickMode(this.value)" style="max-width:180px">
-    <option value="">— اختر سورة —</option>
-  </select>
-  <button class="btn btn-ghost" id="deleteModeBtn" onclick="activateDeleteMode()" style="white-space:nowrap;flex-shrink:0;color:var(--s-improve);border-color:#fca5a5">🗑 حذف متعدد</button>
-  <div id="deleteBar" class="cm-bar del-bar hidden">
-    <div class="cm-pulse"></div>
-    <span>وضع الحذف</span>
-    <span id="delSelCount" style="font-size:12px;opacity:.8;white-space:nowrap"></span>
-    <button class="del-save-btn" id="delSaveBtn" onclick="saveDeleteMode()">حذف</button>
-    <button onclick="clearDeleteMode()">إلغاء</button>
+  <span class="filter-sep" style="margin-inline-start:auto"></span>
+  <div style="display:flex;align-items:center;gap:10px">
+    <button class="btn btn-ghost" onclick="clearFilters()">مسح الفلاتر</button>
+    <span class="filter-sep"></span>
+    <input class="fname-search" id="fNameSearch" type="text" placeholder="🔍 ابحث باسم الملف…" oninput="applyFilters()" autocomplete="off" dir="ltr">
   </div>
-
-  <div id="cmBar" class="cm-bar hidden">
-    <div class="cm-pulse"></div>
-    <span id="cmName"></span>
-    <span id="cmSelCount" style="font-size:12px;opacity:.8;white-space:nowrap"></span>
-    <button class="cm-save-btn" id="cmSaveBtn" onclick="saveClickMode()">حفظ</button>
-    <button onclick="clearClickMode()">إلغاء</button>
-  </div>
-
-  <button class="btn btn-ghost" style="margin-inline-start:auto" onclick="clearFilters()">مسح الفلاتر</button>
 </div>
 
 <!-- ── STATS BAR ── -->
@@ -952,7 +917,7 @@ input[type=range].pen-size {
       </div>
       <div class="modal-form">
 
-        <div class="form-group">
+        <div class="form-group" id="mTagGroup">
           <label class="form-label">السور في هذه الصورة</label>
           <div class="ms-wrap" id="mWrap">
             <div class="ms-btn" id="mBtn" onclick="toggleDrop('m')">
@@ -984,7 +949,15 @@ input[type=range].pen-size {
             <button class="status-opt" id="optImprove" onclick="setStatus('improve')">
               <div class="status-ind" style="background:var(--s-improve)"></div>يحتاج تحسين
             </button>
+            <button class="status-opt" id="optRepeated" onclick="setStatus('repeated')">
+              <div class="status-ind" style="background:var(--s-repeated)"></div>مكرر
+            </button>
           </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">وحدات العمل</label>
+          <input id="modalUnits" type="number" min="0" step="0.5" placeholder="0" style="width:100px;padding:6px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;font-family:inherit;outline:none;background:var(--surface2);color:var(--text)">
         </div>
 
         <div class="form-group">
@@ -999,7 +972,7 @@ input[type=range].pen-size {
       <button class="btn btn-ghost"    onclick="openEditor()">✏ تعديل الصورة</button>
       <button class="btn btn-ghost"    onclick="closeModal()">إلغاء</button>
       <span class="spacer"></span>
-      <button class="btn btn-danger"   onclick="deleteImage()">🗑 حذف</button>
+      <button class="btn btn-danger" id="modalDeleteBtn" onclick="deleteImage()">🗑 حذف</button>
     </div>
   </div>
 </div>
@@ -1052,7 +1025,7 @@ input[type=range].pen-size {
 
 <!-- ── CONTEXT MENU ── -->
 <div class="ctx-menu hidden" id="ctxMenu">
-  <div class="ctx-item danger" onclick="ctxDelete()">🗑 حذف الصورة</div>
+  <div class="ctx-item danger" id="ctxDeleteItem" onclick="ctxDelete()">🗑 حذف الصورة</div>
 </div>
 
 <!-- ── STATS OVERLAY ── -->
@@ -1066,12 +1039,44 @@ input[type=range].pen-size {
   </div>
 </div>
 
+<!-- ── DETAILED STATS OVERLAY ── -->
+<div class="overlay hidden" id="detailedStatsOverlay" onclick="onDetailedStatsOverlayClick(event)">
+  <div class="stats-modal">
+    <div class="stats-header">
+      <span class="stats-title">📈 الإحصائيات التفصيلية</span>
+      <button class="btn btn-ghost" onclick="closeDetailedStats()">✕ إغلاق</button>
+    </div>
+    <div class="stats-body" id="detailedStatsBody"></div>
+  </div>
+</div>
+
+
+<!-- ── MANAGE TAGS OVERLAY ── -->
+<div class="overlay hidden" id="manageTagsOverlay" onclick="onManageTagsOverlayClick(event)">
+  <div class="stats-modal" style="width:min(560px,96vw)">
+    <div class="stats-header">
+      <span class="stats-title">🏷 إدارة الوسوم</span>
+      <button class="btn btn-ghost" onclick="closeManageTags()">✕ إغلاق</button>
+    </div>
+    <div class="stats-body" id="manageTagsBody"></div>
+  </div>
+</div>
+
 <!-- ── VIEW MODE ── -->
 <div id="viewOverlay" class="view-overlay hidden">
   <div class="view-header">
     <button class="view-hdr-btn" onclick="closeViewMode()">✕</button>
     <span class="view-filename" id="viewFilename"></span>
+    <button class="view-hdr-btn" id="copyNameBtn" onclick="copyFilename()" title="نسخ اسم الملف">⎘</button>
     <span class="view-counter" id="viewCounter"></span>
+  </div>
+
+  <div id="reviewBar" class="review-bar hidden">
+    <div class="review-progress-track">
+      <div class="review-progress-fill" id="reviewProgressFill"></div>
+    </div>
+    <span id="reviewProgressText" class="review-progress-text"></span>
+    <button class="review-exit-btn" onclick="closeViewMode()">إنهاء المراجعة</button>
   </div>
 
   <div class="view-img-area" id="viewImgArea">
@@ -1080,104 +1085,32 @@ input[type=range].pen-size {
     <button class="view-nav-btn view-next-btn" id="viewNextBtn" onclick="viewNav(1)">›</button>
   </div>
 
-  <div class="view-meta" id="viewMeta"></div>
-
-  <!-- Always-visible surah tag bar -->
-  <div class="view-tag-bar" id="viewTagBar">
-    <div class="view-tag-wrap" onclick="document.getElementById('viewTagInput').focus()">
-      <div id="viewTagChips"></div>
-      <input class="view-tag-input" id="viewTagInput" type="text" placeholder="أضف سورة…" autocomplete="off">
-    </div>
-    <div class="view-sug-drop hidden" id="viewSugDrop"></div>
-  </div>
-
-  <div class="view-actions">
-    <button class="view-act-btn" id="vaBtnFilter" onclick="toggleVPanel('vp-filter')">
-      <span class="va-icon">⚙</span><span class="va-label">فلتر</span>
-    </button>
-    <button class="view-act-btn" id="vaBtnSurahs" onclick="toggleVPanel('vp-surahs')">
-      <span class="va-icon">📖</span><span class="va-label">السور</span>
-    </button>
-    <button class="view-act-btn" id="vaBtnFlags" onclick="toggleVPanel('vp-flags')">
-      <span class="va-icon">🏷</span><span class="va-label">الحالة</span>
-    </button>
-    <button class="view-act-btn" id="vaBtnNote" onclick="toggleVPanel('vp-note')">
-      <span class="va-icon">📝</span><span class="va-label">ملاحظة</span>
-    </button>
-    <button class="view-act-btn" onclick="openEditorFromView()">
-      <span class="va-icon">✏</span><span class="va-label">تعديل</span>
-    </button>
-    <button class="view-act-btn va-danger" onclick="deleteFromView()">
-      <span class="va-icon">🗑</span><span class="va-label">حذف</span>
-    </button>
-  </div>
-
-  <!-- Filter panel -->
-  <div class="view-panel hidden" id="vp-filter">
-    <div class="vp-header">
-      <span class="vp-title">فلترة الصور</span>
-      <button class="vp-close" onclick="closeVPanel()">✕</button>
-    </div>
-    <div class="vp-body" id="vpFilterBody"></div>
-    <div class="vp-footer">
-      <button class="btn btn-ghost" style="color:#e2e8f0;border-color:#374151" onclick="clearFiltersFromView()">مسح الفلاتر</button>
-    </div>
-  </div>
-
-  <!-- Surahs panel -->
-  <div class="view-panel hidden" id="vp-surahs">
-    <div class="vp-header">
-      <span class="vp-title">السور في هذه الصورة</span>
-      <button class="vp-close" onclick="closeVPanel()">✕</button>
-    </div>
-    <div class="vp-body">
-      <div class="vp-tag-input-wrap" onclick="document.getElementById('vpTagInput').focus()">
-        <div id="vpTagChips"></div>
-        <input class="vp-tag-input" id="vpTagInput" type="text" placeholder="اكتب اسم السورة أو رقمها…" autocomplete="off">
+  <!-- Controls row: tag input + status buttons + icon actions -->
+  <div class="view-controls-row">
+    <div class="view-tag-area" id="viewTagArea">
+      <div class="view-tag-wrap" onclick="document.getElementById('viewTagInput').focus()">
+        <div id="viewTagChips"></div>
+        <input class="view-tag-input" id="viewTagInput" type="text" placeholder="أضف سورة…" autocomplete="off">
       </div>
-      <div class="vp-sug-list" id="vpSugList"></div>
+      <div class="view-sug-drop hidden" id="viewSugDrop"></div>
     </div>
-    <div class="vp-footer">
-      <button class="btn btn-primary" onclick="saveVPSurahs()">حفظ</button>
-      <span class="vp-count" id="vpSurahCount"></span>
-    </div>
+    <div class="view-status-btns" id="viewStatusBtns"></div>
+    <button class="view-icon-btn" onclick="openEditorFromView()" title="تعديل">✏</button>
+    <button class="view-icon-btn va-danger" id="viewDeleteBtn" onclick="deleteFromView()" title="حذف">🗑</button>
   </div>
 
-  <!-- Flags panel -->
-  <div class="view-panel hidden" id="vp-flags">
-    <div class="vp-header">
-      <span class="vp-title">الحالة والتصنيف</span>
-      <button class="vp-close" onclick="closeVPanel()">✕</button>
-    </div>
-    <div class="vp-body vp-flags-body">
-      <div class="form-group" style="padding:0">
-        <label class="form-label">الحالة</label>
-        <div class="status-grid" style="margin-top:8px">
-          <button class="status-opt" id="vpOptNone"    onclick="setVStatus('none')"><div class="status-ind" style="background:var(--s-none)"></div>لم يُبدأ</button>
-          <button class="status-opt" id="vpOptPartial" onclick="setVStatus('partial')"><div class="status-ind" style="background:var(--s-partial)"></div>منجز جزئياً</button>
-          <button class="status-opt" id="vpOptDone"    onclick="setVStatus('done')"><div class="status-ind" style="background:var(--s-done)"></div>منجز</button>
-          <button class="status-opt" id="vpOptImprove" onclick="setVStatus('improve')"><div class="status-ind" style="background:var(--s-improve)"></div>يحتاج تحسين</button>
-        </div>
-      </div>
-    </div>
-    <div class="vp-footer">
-      <button class="btn btn-primary" onclick="saveVPFlags()">حفظ</button>
+  <!-- Notes row (current user) -->
+  <div class="view-note-bar">
+    <textarea class="view-note-input" id="viewNoteInput" placeholder="ملاحظتك…" autocomplete="off" rows="1" onblur="saveViewNote()" oninput="autoResizeNote(this)" style="flex:1"></textarea>
+    <div class="view-units-wrap">
+      <span class="view-units-label">وحدات العمل</span>
+      <input class="view-units-input" id="viewUnitsInput" type="number" min="0" step="0.5" placeholder="0" onblur="saveViewUnits()" onkeydown="if(event.key==='Enter')this.blur()">
     </div>
   </div>
-
-  <!-- Note panel -->
-  <div class="view-panel hidden" id="vp-note">
-    <div class="vp-header">
-      <span class="vp-title">ملاحظات</span>
-      <button class="vp-close" onclick="closeVPanel()">✕</button>
-    </div>
-    <div class="vp-body">
-      <textarea id="vpNoteText" class="vp-note-ta" placeholder="أضف ملاحظة…"></textarea>
-    </div>
-    <div class="vp-footer">
-      <button class="btn btn-primary" onclick="saveVPNote()">حفظ</button>
-    </div>
-  </div>
+  <!-- Other users' statuses -->
+  <div class="vm-other-bar hidden" id="vmOtherBar"></div>
+  <!-- Other users' notes -->
+  <div class="vm-user-note-bar hidden" id="vmOtherNotes"></div>
 </div>
 
 <!-- ── TOAST ── -->
@@ -1224,11 +1157,75 @@ const IMG_EXTS = new Set(['jpg','jpeg','png','webp','gif','bmp','avif','tif','ti
 // ═══════════════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════════════
-let dirHandle = null;
-let db        = {};    // filename → { surahs, status, notes }
-let allImages = [];
-let filtered  = [];
-let urlCache  = {};
+const USERS = {
+  a: { label: 'A', color: '#2563eb' },
+  b: { label: 'Z', color: '#7c3aed' },
+  c: { label: 'S', color: '#d97706' },
+};
+
+// Built-in status tags (fixed, cannot be removed). "none" is the implicit default and isn't listed here.
+const BUILTIN_STATUSES = [
+  { id: 'partial',  label: 'جزئي',          color: '#f59e0b' },
+  { id: 'done',     label: 'منجز',           color: '#10b981' },
+  { id: 'improve',  label: 'يحتاج تحسين',    color: '#ef4444' },
+  { id: 'repeated', label: 'مكرر',           color: '#8b5cf6' },
+];
+let customStatusTags = []; // [{ id, label, color }], loaded from status_tags.json
+
+function allStatusTags() { return [...BUILTIN_STATUSES, ...customStatusTags]; }
+function isBuiltinStatus(id) { return id === 'none' || BUILTIN_STATUSES.some(t => t.id === id); }
+function statusMeta(id) {
+  if (!id || id === 'none') return { id: 'none', label: 'لم يُبدأ', color: '#9ca3af' };
+  return allStatusTags().find(t => t.id === id) || { id, label: id, color: '#6b7280' };
+}
+function nextCustomTagId() {
+  const nums = customStatusTags
+    .map(t => parseInt(String(t.id).replace('custom_', ''), 10))
+    .filter(n => Number.isFinite(n));
+  return 'custom_' + ((nums.length ? Math.max(...nums) : 0) + 1);
+}
+function hexToRgba(hex, alpha) {
+  const clean = (hex || '#6b7280').replace('#', '');
+  const r = parseInt(clean.substring(0, 2), 16) || 0;
+  const g = parseInt(clean.substring(2, 4), 16) || 0;
+  const b = parseInt(clean.substring(4, 6), 16) || 0;
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+let dirHandle     = null;
+let db            = {};    // filename → { surahs }
+let allUserStates = {};    // { 'a': { filename → {status,notes} }, ... }
+let currentUser   = localStorage.getItem('pictool-user') || 'a';
+let allImages     = [];
+let filtered      = [];
+let urlCache      = {};
+
+function canEditTags() { return true; }
+function canDelete()   { return currentUser === 'c'; }
+function canManage()   { return currentUser === 'c'; } // review mode: S only
+
+function getState(user, name) {
+  return (allUserStates[user] || {})[name]
+
+      || { status: 'none', notes: '' };
+}
+function myState(name) { return getState(currentUser, name); }
+function setMyState(name, patch) {
+  if (!allUserStates[currentUser]) allUserStates[currentUser] = {};
+  allUserStates[currentUser][name] = { ...getState(currentUser, name), ...patch };
+}
+
+// The single status used for aggregate statistics/filtering: each picture is
+// tagged independently per user, so this picks the most-complete status found
+// across all users (done > partial > improve > repeated > custom tags > none)
+// rather than only the currently active user's own status.
+function effectiveStatus(name) {
+  const order = ['done', 'partial', 'improve', 'repeated', ...customStatusTags.map(t => t.id)];
+  for (const st of order) {
+    if (Object.keys(USERS).some(u => (getState(u, name).status || 'none') === st)) return st;
+  }
+  return 'none';
+}
 let thumbObs  = null;
 
 let fSurahs   = [];    // filter: selected surahs
@@ -1262,25 +1259,51 @@ async function idbGet(k)   { const d=await idb(); return new Promise((res,rej)=>
 // ═══════════════════════════════════════════════
 async function readDB() {
   db = {};
+  allUserStates = {};
   try {
     const fh = await dirHandle.getFileHandle('tags.json');
     const tags = JSON.parse(await (await fh.getFile()).text()).images || {};
     for (const [name, surahs] of Object.entries(tags))
-      db[name] = { ...(db[name] || {}), surahs: Array.isArray(surahs) ? surahs : [] };
+      db[name] = { surahs: Array.isArray(surahs) ? surahs : [] };
   } catch {}
+
+  customStatusTags = [];
   try {
-    const fh = await dirHandle.getFileHandle('states.json');
-    const states = JSON.parse(await (await fh.getFile()).text()).images || {};
-    for (const [name, s] of Object.entries(states))
-      db[name] = { ...(db[name] || {}), status: s.status || 'none', notes: s.notes || '' };
+    const fh = await dirHandle.getFileHandle('status_tags.json');
+    const data = JSON.parse(await (await fh.getFile()).text());
+    customStatusTags = Array.isArray(data.tags) ? data.tags : [];
   } catch {}
-  // Migrate from old single data.json if no new files exist yet
+  // Read all *_states.json (one per user), match by display label
+  const labelToKey = Object.fromEntries(Object.entries(USERS).map(([k, v]) => [v.label.toLowerCase(), k]));
+  for await (const [fname, handle] of dirHandle.entries()) {
+    const m = fname.match(/^([a-z]+)_states\.json$/i);
+    if (!m || handle.kind !== 'file') continue;
+    const userKey = labelToKey[m[1].toLowerCase()];
+    if (!userKey) continue;
+    try {
+      const data = JSON.parse(await (await handle.getFile()).text());
+      allUserStates[userKey] = data.images || {};
+    } catch {}
+  }
+
+  // Load legacy states.json into user Z (b) if no b_states.json exists yet
+  if (!allUserStates['b']) {
+    try {
+      const fh = await dirHandle.getFileHandle('states.json');
+      const data = JSON.parse(await (await fh.getFile()).text());
+      if (data.images && Object.keys(data.images).length) allUserStates['b'] = data.images;
+    } catch {}
+  }
+
+  // Migrate from old data.json if no tags at all
   if (!Object.keys(db).length) {
     try {
       const fh = await dirHandle.getFileHandle('data.json');
       const old = JSON.parse(await (await fh.getFile()).text()).images || {};
-      for (const [name, m] of Object.entries(old))
-        db[name] = { surahs: m.surahs || [], status: m.status || 'none', notes: m.notes || '' };
+      for (const [name, m] of Object.entries(old)) {
+        db[name] = { surahs: m.surahs || [] };
+        setMyState(name, { status: m.status || 'none', notes: m.notes || '' });
+      }
       if (Object.keys(db).length) { await writeTagsDB(); await writeStatesDB(); showToast('تم الترقية إلى صيغة الملفين ✓'); }
     } catch {}
   }
@@ -1298,13 +1321,21 @@ async function writeTagsDB() {
 
 async function writeStatesDB() {
   const images = {};
-  for (const [name, m] of Object.entries(db)) {
-    if ((m.status && m.status !== 'none') || m.notes)
-      images[name] = { status: m.status || 'none', notes: m.notes || '' };
+  for (const [name, s] of Object.entries(allUserStates[currentUser] || {})) {
+    if ((s.status && s.status !== 'none') || s.notes || s.units)
+      images[name] = { status: s.status || 'none', notes: s.notes || '', units: s.units || 0 };
   }
-  const fh = await dirHandle.getFileHandle('states.json', { create: true });
+  const label = USERS[currentUser].label.toLowerCase();
+  const fh = await dirHandle.getFileHandle(`${label}_states.json`, { create: true });
   const w  = await fh.createWritable();
-  await w.write(JSON.stringify({ version: 1, saved: new Date().toISOString(), images }, null, 2));
+  await w.write(JSON.stringify({ version: 1, user: currentUser, saved: new Date().toISOString(), images }, null, 2));
+  await w.close();
+}
+
+async function writeStatusTagsDB() {
+  const fh = await dirHandle.getFileHandle('status_tags.json', { create: true });
+  const w  = await fh.createWritable();
+  await w.write(JSON.stringify({ version: 1, saved: new Date().toISOString(), tags: customStatusTags }, null, 2));
   await w.close();
 }
 
@@ -1312,6 +1343,9 @@ async function writeDB() {
   await writeTagsDB();
   await writeStatesDB();
 }
+
+let reviewedSet = new Set();
+let reviewMode  = false;
 
 // ═══════════════════════════════════════════════
 //  FOLDER
@@ -1336,7 +1370,11 @@ async function loadApp() {
   ['appHeader','filterBar','statsBar','grid'].forEach(id => document.getElementById(id).classList.remove('hidden'));
   await readDB();
   await scanImages();
+  renderUserFilterBtns();
+  renderStatusFilterOptions();
+  buildViewStatusButtons();
   applyFilters();
+  updateUserSelector();
 }
 
 async function scanImages() {
@@ -1354,6 +1392,8 @@ async function refreshImages() {
   showToast('جاري التحديث…');
   await readDB();
   await scanImages();
+  renderStatusFilterOptions();
+  buildViewStatusButtons();
   applyFilters();
   showToast('تم التحديث ✓');
 }
@@ -1370,15 +1410,52 @@ function adjustSize(delta) {
   onSizeChange(sl.value);
 }
 
+let fUsers = new Set();
+
+function renderUserFilterBtns() {
+  const wrap = document.getElementById('userFilterBtns');
+  if (!wrap) return;
+  wrap.innerHTML = Object.entries(USERS).map(([key, u]) =>
+    `<button class="uf-btn${fUsers.has(key) ? ' active' : ''}" id="ufBtn-${key}"
+      style="${fUsers.has(key) ? `background:${u.color};border-color:${u.color}` : ''}"
+      onclick="toggleUserFilter('${key}')">${u.label}</button>`
+  ).join('');
+}
+
+function toggleUserFilter(key) {
+  fUsers.has(key) ? fUsers.delete(key) : fUsers.add(key);
+  renderUserFilterBtns();
+  applyFilters();
+}
+
 function applyFilters() {
-  const sf       = document.getElementById('fStatus').value;
-  const untagged = document.getElementById('fUntagged').checked;
+  const sf         = document.getElementById('fStatus').value;
+  const tagCount   = document.getElementById('fTagCount').value;
+  const exactSurahs= document.getElementById('fExactSurahs').checked;
+  const nameQ      = (document.getElementById('fNameSearch')?.value || '').trim().toLowerCase();
   filtered = allImages.filter(name => {
+    if (nameQ && !name.toLowerCase().includes(nameQ)) return false;
     const m      = db[name] || {};
     const surahs = m.surahs || [];
-    if (untagged   && surahs.length > 0) return false;
-    if (sf !== 'all' && (m.status||'none') !== sf) return false;
-    if (fSurahs.length > 0 && !fSurahs.some(s => surahs.includes(s))) return false;
+    if (tagCount === '0' && surahs.length !== 0) return false;
+    if (tagCount === '1' && surahs.length !== 1) return false;
+    if (tagCount === '2' && surahs.length !== 2) return false;
+    if (sf !== 'all' && effectiveStatus(name) !== sf) return false;
+    if (fSurahs.length > 0) {
+      if (exactSurahs) {
+        if (surahs.length === 0) return false;
+        if (!surahs.every(s => fSurahs.includes(s))) return false;
+      } else {
+        if (!fSurahs.some(s => surahs.includes(s))) return false;
+      }
+    }
+    if (fUsers.size > 0) {
+      const hasActivity = [...fUsers].some(u => {
+        const st = (allUserStates[u] || {})[name]?.status;
+        return st && st !== 'none';
+      });
+      if (!hasActivity) return false;
+    }
     return true;
   });
   renderGrid();
@@ -1388,17 +1465,24 @@ function renderGrid() {
   const grid  = document.getElementById('grid');
   const empty = document.getElementById('emptyState');
 
-  const total   = allImages.length;
-  const done    = allImages.filter(n=>(db[n]?.status||'none')==='done').length;
-  const partial = allImages.filter(n=>(db[n]?.status||'none')==='partial').length;
-  const improve = allImages.filter(n=>(db[n]?.status||'none')==='improve').length;
-  const none    = total - done - partial - improve;
+  const total    = allImages.length;
+  const done     = filtered.filter(n=>effectiveStatus(n)==='done').length;
+  const partial  = filtered.filter(n=>effectiveStatus(n)==='partial').length;
+  const improve  = filtered.filter(n=>effectiveStatus(n)==='improve').length;
+  const repeated = filtered.filter(n=>effectiveStatus(n)==='repeated').length;
+  const none     = filtered.filter(n=>effectiveStatus(n)==='none').length;
+  const customPills = customStatusTags.map(t => {
+    const count = filtered.filter(n => effectiveStatus(n) === t.id).length;
+    return count ? `<span class="stat-pill"><span class="dot" style="background:${t.color}"></span>${count} ${h(t.label)}</span>` : '';
+  }).join('');
   document.getElementById('statsText').innerHTML =
     `عرض <strong>${filtered.length}</strong> من ${total} صورة &nbsp;&nbsp;
      <span class="stat-pill"><span class="dot" style="background:var(--s-done)"></span>${done} منجز</span>
      <span class="stat-pill"><span class="dot" style="background:var(--s-partial)"></span>${partial} جزئي</span>
      <span class="stat-pill"><span class="dot" style="background:var(--s-improve)"></span>${improve} يحتاج تحسين</span>
-     <span class="stat-pill"><span class="dot" style="background:var(--s-none)"></span>${none} لم يُبدأ</span>`;
+     <span class="stat-pill"><span class="dot" style="background:var(--s-repeated)"></span>${repeated} مكرر</span>
+     <span class="stat-pill"><span class="dot" style="background:var(--s-none)"></span>${none} لم يُبدأ</span>
+     ${customPills}`;
 
   if (!filtered.length) {
     grid.classList.add('hidden'); empty.classList.remove('hidden'); return;
@@ -1417,33 +1501,48 @@ function renderGrid() {
   grid.innerHTML = '';
   for (const name of filtered) {
     const m      = db[name] || {};
-    const status = m.status || 'none';
+    const myS    = myState(name);
+    const status = myS.status || 'none';
     const surahs = m.surahs || [];
-    const notes  = m.notes  || '';
+    const notes  = myS.notes || '';
 
-    const badge =
-      status === 'done'    ? `<div class="status-badge badge-done">منجز</div>` :
-      status === 'partial' ? `<div class="status-badge badge-partial">جزئي</div>` :
-      status === 'improve' ? `<div class="status-badge badge-improve">يحتاج تحسين</div>` : '';
+    const badge = status !== 'none'
+      ? (isBuiltinStatus(status)
+          ? `<div class="status-badge badge-${status}">${h(statusMeta(status).label)}</div>`
+          : `<div class="status-badge" style="background:${statusMeta(status).color}">${h(statusMeta(status).label)}</div>`)
+      : '';
     const chips = surahs.length
       ? surahs.map(n=>`<span class="surah-chip">${n}. ${SMAP.get(n)||''}<span class="chip-x" onclick="event.stopPropagation();removeSurahTag(${JSON.stringify(name)},${n})" title="حذف هذه السورة">×</span></span>`).join('')
       : `<span style="color:#ccc;font-size:10px">لا سور محددة</span>`;
 
     const noteHTML = notes ? `<div class="card-note" title="${h(notes)}">${h(notes)}</div>` : '';
 
+    const otherChips = Object.entries(USERS)
+      .filter(([u]) => u !== currentUser && (getState(u, name).status||'none') !== 'none')
+      .map(([u, ud]) => {
+        const st = getState(u, name).status;
+        const meta = statusMeta(st);
+        return `<span class="user-chip" style="background:rgba(0,0,0,.08);border:1px solid ${ud.color}30;color:#334155">
+          <span class="user-chip-dot" style="background:${ud.color}"></span>
+          <span style="color:${ud.color};font-weight:700">${ud.label}</span>
+          <span style="color:${meta.color}">${h(meta.label)}</span>
+        </span>`;
+      }).join('');
+    const otherRow = otherChips ? `<div class="card-users">${otherChips}</div>` : '';
+
     const card = document.createElement('div');
-    card.className = `card${status!=='none' ? ' s-'+status : ''}`;
+    card.className = `card${status!=='none' && isBuiltinStatus(status) ? ' s-'+status : ''}`;
+    if (status !== 'none' && !isBuiltinStatus(status)) card.style.borderColor = statusMeta(status).color;
     card.innerHTML = `
       <div class="card-img-wrap" data-name="${h(name)}">
         <div class="card-img-placeholder">🖼</div>
+        <button class="card-copy-btn" onclick="event.stopPropagation();copyCardName(${JSON.stringify(name)})" title="نسخ اسم الملف">📋</button>
       </div>
       ${badge}
       <div class="card-body">
         <div class="card-name" title="${h(name)}">${h(name)}</div>
-        <div class="card-tags">${chips}</div>${noteHTML}
+        <div class="card-tags">${chips}</div>${noteHTML}${otherRow}
       </div>`;
-    if (deleteModeSelected.has(name))      card.classList.add('del-selected');
-    if (clickModeSelected.has(name))       card.classList.add('cm-selected');
     attachLongPress(card, name);
     grid.appendChild(card);
     thumbObs.observe(card.querySelector('.card-img-wrap'));
@@ -1463,9 +1562,109 @@ async function loadThumb(name, wrap) {
     img.src = url; img.alt = name;
     wrap.innerHTML = '';
     wrap.appendChild(img);
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'card-copy-btn';
+    copyBtn.title = 'نسخ اسم الملف';
+    copyBtn.textContent = '📋';
+    copyBtn.onclick = e => { e.stopPropagation(); copyCardName(name); };
+    wrap.appendChild(copyBtn);
   } catch {
     if (document.body.contains(wrap)) wrap.innerHTML = '<span style="font-size:11px;color:#aaa">خطأ</span>';
   }
+}
+
+// ═══════════════════════════════════════════════
+//  STATUS TAGS
+// ═══════════════════════════════════════════════
+function renderStatusFilterOptions() {
+  const sel     = document.getElementById('fStatus');
+  const current = sel.value || 'all';
+  const builtinOptions = `
+    <option value="all">الكل</option>
+    <option value="none">لم يُبدأ</option>
+    <option value="partial">منجز جزئياً</option>
+    <option value="done">منجز</option>
+    <option value="improve">يحتاج تحسين</option>
+    <option value="repeated">مكرر</option>`;
+  const customOptions = customStatusTags.map(t => `<option value="${t.id}">${h(t.label)}</option>`).join('');
+  sel.innerHTML = builtinOptions + customOptions;
+  sel.value = [...sel.options].some(o => o.value === current) ? current : 'all';
+}
+
+function openManageTags() {
+  renderManageTags();
+  document.getElementById('manageTagsOverlay').classList.remove('hidden');
+}
+function closeManageTags() { document.getElementById('manageTagsOverlay').classList.add('hidden'); }
+function onManageTagsOverlayClick(e) { if (e.target.id === 'manageTagsOverlay') closeManageTags(); }
+
+async function addCustomStatusTag() {
+  const labelInp = document.getElementById('newTagLabel');
+  const colorInp = document.getElementById('newTagColor');
+  const label = labelInp.value.trim();
+  if (!label) { showToast('يرجى إدخال اسم الوسم'); return; }
+  if (label === 'لم يُبدأ' || allStatusTags().some(t => t.label === label)) {
+    showToast('يوجد وسم بنفس الاسم بالفعل'); return;
+  }
+  customStatusTags.push({ id: nextCustomTagId(), label, color: colorInp.value || '#6b7280' });
+  await writeStatusTagsDB();
+  labelInp.value = '';
+  renderManageTags();
+  renderStatusFilterOptions();
+  buildViewStatusButtons();
+  applyFilters();
+  showToast(`تمت إضافة الوسم "${label}" ✓`);
+}
+
+async function removeCustomStatusTag(id) {
+  const tag = customStatusTags.find(t => t.id === id);
+  if (!tag) return;
+  if (!confirm(`حذف الوسم "${tag.label}"؟ لن تتغيّر حالة الصور الموسومة به حالياً، لكنه سيختفي من قوائم التصفية والوسم.`)) return;
+  customStatusTags = customStatusTags.filter(t => t.id !== id);
+  await writeStatusTagsDB();
+  renderManageTags();
+  renderStatusFilterOptions();
+  buildViewStatusButtons();
+  applyFilters();
+  showToast(`تم حذف الوسم "${tag.label}"`);
+}
+
+function renderManageTags() {
+  const builtinRows = ['none', ...BUILTIN_STATUSES.map(t => t.id)].map(id => {
+    const meta = statusMeta(id);
+    return `
+    <div class="tag-manage-row">
+      <span class="tag-color-dot" style="background:${meta.color}"></span>
+      <span class="tag-manage-label">${h(meta.label)}</span>
+      <span class="tag-manage-builtin">أساسي — غير قابل للحذف</span>
+    </div>`;
+  }).join('');
+
+  const customRows = customStatusTags.map(t => `
+    <div class="tag-manage-row">
+      <span class="tag-color-dot" style="background:${t.color}"></span>
+      <span class="tag-manage-label">${h(t.label)}</span>
+      <button class="btn btn-ghost" onclick="removeCustomStatusTag('${t.id}')" title="حذف الوسم">🗑 حذف</button>
+    </div>`).join('');
+
+  document.getElementById('manageTagsBody').innerHTML = `
+    <div>
+      <div class="stats-section-title">الوسوم الأساسية</div>
+      <div class="tag-manage-list">${builtinRows}</div>
+    </div>
+    <div>
+      <div class="stats-section-title">وسوم مخصّصة — ${customStatusTags.length}</div>
+      ${customStatusTags.length ? `<div class="tag-manage-list">${customRows}</div>` : `<div class="dstats-empty">لا توجد وسوم مخصّصة بعد</div>`}
+    </div>
+    <div>
+      <div class="stats-section-title">إضافة وسم جديد</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="text" id="newTagLabel" class="fname-search" style="width:180px" placeholder="اسم الوسم…" dir="rtl">
+        <input type="color" id="newTagColor" value="#0ea5e9" style="width:40px;height:30px;border:1px solid var(--border);border-radius:6px;cursor:pointer">
+        <button class="btn btn-primary" onclick="addCustomStatusTag()">+ إضافة</button>
+      </div>
+    </div>
+  `;
 }
 
 // ═══════════════════════════════════════════════
@@ -1537,8 +1736,9 @@ function updateTags(id) {
 
 function clearFilters() {
   fSurahs.length = 0;
-  document.getElementById('fStatus').value   = 'all';
-  document.getElementById('fUntagged').checked = false;
+  document.getElementById('fStatus').value        = 'all';
+  document.getElementById('fTagCount').value       = '';
+  document.getElementById('fExactSurahs').checked  = false;
   updateTags('f');
   applyFilters();
 }
@@ -1558,6 +1758,7 @@ let ctxFile = null;
 function showCtxMenu(e, name) {
   ctxFile = name;
   const menu = document.getElementById('ctxMenu');
+  document.getElementById('ctxDeleteItem').style.display = canDelete() ? '' : 'none';
   menu.classList.remove('hidden');
   const mw = 170, mh = 48;
   menu.style.left = Math.min(e.clientX, window.innerWidth  - mw - 6) + 'px';
@@ -1577,9 +1778,9 @@ async function ctxDelete() {
 
 // ── remove a single surah tag from a card ──
 async function removeSurahTag(name, surahNum) {
-  const m = db[name] || {};
-  const surahs = (m.surahs || []).filter(s => s !== surahNum);
-  db[name] = { ...m, surahs };
+  if (!canEditTags()) return;
+  const surahs = ((db[name]||{}).surahs || []).filter(s => s !== surahNum);
+  db[name] = { surahs };
   await writeDB();
   applyFilters();
   showToast('تم حذف السورة');
@@ -1591,11 +1792,17 @@ async function removeSurahTag(name, surahNum) {
 async function openModal(name) {
   mFile = name;
   const m = db[name] || {};
+  const myS = myState(name);
   mSurahs = [...(m.surahs||[])];
-  mStatus = m.status || 'none';
+  mStatus = myS.status || 'none';
 
   document.getElementById('modalTitle').textContent = name;
-  document.getElementById('modalNotes').value = m.notes || '';
+  document.getElementById('modalNotes').value = myS.notes || '';
+  document.getElementById('modalUnits').value = myS.units || '';
+  const mWrap = document.getElementById('mWrap');
+  mWrap.style.pointerEvents = canEditTags() ? '' : 'none';
+  mWrap.style.opacity = canEditTags() ? '' : '0.6';
+  document.getElementById('modalDeleteBtn').style.display = canDelete() ? '' : 'none';
   updateTags('m');
   updateStatusUI();
 
@@ -1619,11 +1826,12 @@ function closeModal() {
 
 async function saveImage() {
   if (!mFile) return;
-  db[mFile] = {
-    surahs: [...mSurahs],
+  if (canEditTags()) db[mFile] = { surahs: [...mSurahs] };
+  setMyState(mFile, {
     status: mStatus,
-    notes:  document.getElementById('modalNotes').value.trim()
-  };
+    notes:  document.getElementById('modalNotes').value.trim(),
+    units:  sanitizeUnits(document.getElementById('modalUnits').value),
+  });
   await writeDB();
   closeModal();
   applyFilters();
@@ -1631,6 +1839,7 @@ async function saveImage() {
 }
 
 async function deleteImageByName(name) {
+  if (!canDelete()) { showToast('ليس لديك صلاحية الحذف'); return; }
   if (!confirm(`هل تريد حذف هذه الصورة نهائياً؟\n${name}`)) return;
   try {
     await dirHandle.removeEntry(name);
@@ -1653,7 +1862,7 @@ async function deleteImage() {
 
 function setStatus(s) { mStatus = s; updateStatusUI(); }
 function updateStatusUI() {
-  ['none','partial','done','improve'].forEach(s => {
+  ['none','partial','done','improve','repeated'].forEach(s => {
     document.getElementById('opt'+cap(s)).className =
       'status-opt' + (mStatus===s ? ' sel-'+s : '');
   });
@@ -1687,10 +1896,10 @@ async function openEditor() {
     editorCtx.drawImage(img, 0, 0);
     editorHistory = [];
     saveEditorState();
-    fitCanvas();
     setTool('pencil');
     cancelCropSel();
     document.getElementById('editorOverlay').classList.remove('hidden');
+    fitCanvas();
   };
   img.src = url;
 }
@@ -1849,7 +2058,7 @@ function closeEditor() {
   document.getElementById('editorOverlay').classList.add('hidden');
   isDrawing = false; cancelCropSel();
   if (!document.getElementById('viewOverlay').classList.contains('hidden')) {
-    const name = filtered[vmIndex];
+    const name = vmCurrentName;
     if (name) { document.getElementById('viewImg').src = ''; loadViewImg(name); }
   }
 }
@@ -1868,141 +2077,6 @@ function initEditorEvents() {
 
 // ═══════════════════════════════════════════════
 //  DELETE MODE
-// ═══════════════════════════════════════════════
-let deleteModeActive   = false;
-let deleteModeSelected = new Set();
-
-function activateDeleteMode() {
-  clearClickMode();
-  deleteModeActive = true;
-  deleteModeSelected.clear();
-  document.getElementById('deleteBar').classList.remove('hidden');
-  document.getElementById('deleteModeBtn').classList.add('hidden');
-  document.getElementById('grid').classList.add('del-active');
-  updateDeleteCount();
-}
-
-function clearDeleteMode() {
-  deleteModeActive = false;
-  deleteModeSelected.clear();
-  document.querySelectorAll('.card.del-selected').forEach(c => c.classList.remove('del-selected'));
-  document.getElementById('deleteBar').classList.add('hidden');
-  document.getElementById('deleteModeBtn').classList.remove('hidden');
-  document.getElementById('grid').classList.remove('del-active');
-}
-
-function toggleDeleteSelect(name, card) {
-  if (deleteModeSelected.has(name)) {
-    deleteModeSelected.delete(name);
-    card.classList.remove('del-selected');
-  } else {
-    deleteModeSelected.add(name);
-    card.classList.add('del-selected');
-  }
-  updateDeleteCount();
-}
-
-function updateDeleteCount() {
-  const n = deleteModeSelected.size;
-  document.getElementById('delSelCount').textContent = n > 0 ? `— ${n} صورة` : '';
-  document.getElementById('delSaveBtn').classList.toggle('ready', n > 0);
-}
-
-async function saveDeleteMode() {
-  if (!deleteModeSelected.size) return;
-  const names = [...deleteModeSelected];
-  if (!confirm(`هل تريد حذف ${names.length} صورة نهائياً؟\nلا يمكن التراجع عن هذا.`)) return;
-  for (const name of names) {
-    try {
-      await dirHandle.removeEntry(name);
-      if (urlCache[name]) URL.revokeObjectURL(urlCache[name]);
-      delete urlCache[name];
-      delete db[name];
-      allImages = allImages.filter(n => n !== name);
-    } catch(e) { /* skip undeletable files */ }
-  }
-  await writeDB();
-  const count = names.length;
-  clearDeleteMode();
-  applyFilters();
-  showToast(`تم حذف ${count} صورة`);
-}
-
-// ═══════════════════════════════════════════════
-//  CLICK MODE (stamp a surah by clicking)
-// ═══════════════════════════════════════════════
-let clickModeSurah   = null;
-let clickModeSelected = new Set();
-
-function initClickModeSelect() {
-  const sel = document.getElementById('cmSelect');
-  for (const [num, name] of SURAHS) {
-    const opt = document.createElement('option');
-    opt.value = num;
-    opt.textContent = `${num}. ${name}`;
-    sel.appendChild(opt);
-  }
-}
-
-function setClickMode(val) {
-  if (val) { clearDeleteMode(); }
-  clickModeSelected.clear();
-  document.querySelectorAll('.card.cm-selected').forEach(c => c.classList.remove('cm-selected'));
-
-  clickModeSurah = val ? parseInt(val) : null;
-  const bar  = document.getElementById('cmBar');
-  const grid = document.getElementById('grid');
-  if (clickModeSurah) {
-    document.getElementById('cmName').textContent = `${clickModeSurah}. ${SMAP.get(clickModeSurah)}`;
-    bar.classList.remove('hidden');
-    grid.classList.add('cm-active');
-  } else {
-    bar.classList.add('hidden');
-    grid.classList.remove('cm-active');
-  }
-  updateClickModeCount();
-}
-
-function toggleClickSelect(name, card) {
-  if (clickModeSelected.has(name)) {
-    clickModeSelected.delete(name);
-    card.classList.remove('cm-selected');
-  } else {
-    clickModeSelected.add(name);
-    card.classList.add('cm-selected');
-  }
-  updateClickModeCount();
-}
-
-function updateClickModeCount() {
-  const n   = clickModeSelected.size;
-  const btn = document.getElementById('cmSaveBtn');
-  document.getElementById('cmSelCount').textContent = n > 0 ? `— ${n} صورة` : '';
-  btn.classList.toggle('ready', n > 0);
-}
-
-async function saveClickMode() {
-  if (!clickModeSurah || !clickModeSelected.size) return;
-  for (const name of clickModeSelected) {
-    const m      = db[name] || {};
-    const surahs = [...(m.surahs || [])];
-    if (!surahs.includes(clickModeSurah)) surahs.push(clickModeSurah);
-    surahs.sort((a, b) => a - b);
-    db[name] = { ...m, surahs };
-  }
-  await writeDB();
-  const count = clickModeSelected.size;
-  clearClickMode();
-  applyFilters();
-  showToast(`✓ تم حفظ ${count} صورة`);
-}
-
-function clearClickMode() {
-  clickModeSelected.clear();
-  document.querySelectorAll('.card.cm-selected').forEach(c => c.classList.remove('cm-selected'));
-  document.getElementById('cmSelect').value = '';
-  setClickMode('');
-}
 
 // ═══════════════════════════════════════════════
 //  LONG PRESS + QUICK ASSIGN
@@ -2017,7 +2091,7 @@ function attachLongPress(card, name) {
     lpTimer = setTimeout(() => {
       didLongPress = true;
       card.classList.add('lp-active');
-      openQA(name);
+      if (canEditTags()) openQA(name);
     }, 500);
   };
   const move = e => {
@@ -2036,8 +2110,6 @@ function attachLongPress(card, name) {
   card.addEventListener('contextmenu', e => { e.preventDefault(); showCtxMenu(e, name); });
   card.addEventListener('click', (e) => {
     if (didLongPress) { didLongPress = false; return; }
-    if (deleteModeActive) { toggleDeleteSelect(name, card); return; }
-    if (clickModeSurah)   { toggleClickSelect(name, card); return; }
     openViewMode(name);
   });
 }
@@ -2087,8 +2159,8 @@ function updateQACount() {
 }
 
 async function saveQA() {
-  if (!qaFile) return;
-  db[qaFile] = { ...(db[qaFile]||{}), surahs:[...qaSurahs] };
+  if (!qaFile || !canEditTags()) return;
+  db[qaFile] = { surahs: [...qaSurahs] };
   await writeDB();
   closeQA();
   applyFilters();
@@ -2101,9 +2173,11 @@ async function saveQA() {
 document.addEventListener('keydown', e => {
   const inView = !document.getElementById('viewOverlay').classList.contains('hidden');
   if (inView && document.getElementById('editorOverlay').classList.contains('hidden')) {
-    if (e.key === 'Escape') { if (vmPanelOpen) { closeVPanel(); return; } closeViewMode(); return; }
-    if (e.key === 'ArrowLeft')  { viewNav(1);  return; }
-    if (e.key === 'ArrowRight') { viewNav(-1); return; }
+    if (e.key === 'Escape') { closeViewMode(); return; }
+    if (!['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) {
+      if (e.key === 'ArrowLeft')  { viewNav(1);  return; }
+      if (e.key === 'ArrowRight') { viewNav(-1); return; }
+    }
     if (e.key === 't' && !e.ctrlKey && !e.metaKey && !e.altKey && !['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) {
       e.preventDefault(); document.getElementById('viewTagInput').focus(); return;
     }
@@ -2112,6 +2186,8 @@ document.addEventListener('keydown', e => {
     if (!document.getElementById('editorOverlay').classList.contains('hidden')) { closeEditor(); return; }
     if (!document.getElementById('qaOverlay').classList.contains('hidden'))     { closeQA(); return; }
     if (!document.getElementById('statsOverlay').classList.contains('hidden'))  { closeStats(); return; }
+    if (!document.getElementById('detailedStatsOverlay').classList.contains('hidden')) { closeDetailedStats(); return; }
+    if (!document.getElementById('manageTagsOverlay').classList.contains('hidden')) { closeManageTags(); return; }
     hideCtxMenu();
     closeModal();
     closeDrop('f'); closeDrop('m');
@@ -2148,16 +2224,26 @@ function closeStats() { document.getElementById('statsOverlay').classList.add('h
 function onStatsOverlayClick(e) { if (e.target.id === 'statsOverlay') closeStats(); }
 
 function renderStats() {
-  const total   = allImages.length;
-  const done    = allImages.filter(n => (db[n]?.status||'none') === 'done').length;
-  const partial = allImages.filter(n => (db[n]?.status||'none') === 'partial').length;
-  const improve = allImages.filter(n => (db[n]?.status||'none') === 'improve').length;
-  const none    = total - done - partial - improve;
+  const total    = allImages.length;
+  const done     = allImages.filter(n => effectiveStatus(n) === 'done').length;
+  const partial  = allImages.filter(n => effectiveStatus(n) === 'partial').length;
+  const improve  = allImages.filter(n => effectiveStatus(n) === 'improve').length;
+  const repeated = allImages.filter(n => effectiveStatus(n) === 'repeated').length;
+  const none     = allImages.filter(n => effectiveStatus(n) === 'none').length;
+
+  const userUnits = {};
+  let totalUnits = 0;
+  for (const u of Object.keys(USERS)) {
+    const sum = allImages.reduce((acc, n) => acc + (sanitizeUnits((allUserStates[u]||{})[n]?.units) || 0), 0);
+    userUnits[u] = Math.round(sum * 2) / 2;
+    totalUnits += userUnits[u];
+  }
+  totalUnits = Math.round(totalUnits * 2) / 2;
 
   const surahCounts = new Map();
   const surahDone   = new Map();
   for (const name of allImages) {
-    const isDone = (db[name]?.status || 'none') === 'done';
+    const isDone = effectiveStatus(name) === 'done';
     for (const s of (db[name]?.surahs || [])) {
       surahCounts.set(s, (surahCounts.get(s) || 0) + 1);
       if (isDone) surahDone.set(s, (surahDone.get(s) || 0) + 1);
@@ -2173,6 +2259,7 @@ function renderStats() {
         <div class="stats-bar-seg" style="width:${pct(done)}%;background:var(--s-done)"></div>
         <div class="stats-bar-seg" style="width:${pct(partial)}%;background:var(--s-partial)"></div>
         <div class="stats-bar-seg" style="width:${pct(improve)}%;background:var(--s-improve)"></div>
+        <div class="stats-bar-seg" style="width:${pct(repeated)}%;background:var(--s-repeated)"></div>
         <div class="stats-bar-seg" style="width:${pct(none)}%;background:var(--s-none)"></div>
       </div>
       <div class="stats-status-row">
@@ -2195,11 +2282,30 @@ function renderStats() {
           <div class="stats-card-label">يحتاج تحسين</div>
           <div class="stats-card-pct">${pct(improve)}%</div>
         </div>
+        <div class="stats-card sc-repeated">
+          <div class="stats-card-num" style="color:var(--s-repeated)">${repeated}</div>
+          <div class="stats-card-label">مكرر</div>
+          <div class="stats-card-pct">${pct(repeated)}%</div>
+        </div>
         <div class="stats-card sc-none">
           <div class="stats-card-num" style="color:var(--s-none)">${none}</div>
           <div class="stats-card-label">لم يُبدأ</div>
           <div class="stats-card-pct">${pct(none)}%</div>
         </div>
+      </div>
+    </div>
+    <div>
+      <div class="stats-section-title">وحدات العمل</div>
+      <div class="units-stat-row">
+        <div class="units-stat-card">
+          <div class="units-stat-num" style="color:var(--primary)">${totalUnits}</div>
+          <div class="units-stat-label">الإجمالي</div>
+        </div>
+        ${Object.entries(USERS).map(([u, ud]) => `
+        <div class="units-stat-card">
+          <div class="units-stat-num" style="color:${ud.color}">${userUnits[u]}</div>
+          <div class="units-stat-label">${ud.label}</div>
+        </div>`).join('')}
       </div>
     </div>
     ${surahEntries.length ? `
@@ -2232,77 +2338,317 @@ function filterBySurahFromStats(num) {
   updateTags('f');
   applyFilters();
   closeStats();
+  closeDetailedStats();
+}
+
+function openDetailedStats() {
+  renderDetailedStats();
+  document.getElementById('detailedStatsOverlay').classList.remove('hidden');
+}
+function closeDetailedStats() { document.getElementById('detailedStatsOverlay').classList.add('hidden'); }
+function onDetailedStatsOverlayClick(e) { if (e.target.id === 'detailedStatsOverlay') closeDetailedStats(); }
+
+function filterByPairFromStats(a, b) {
+  fSurahs.length = 0; fSurahs.push(a, b);
+  updateTags('f');
+  document.getElementById('fExactSurahs').checked = true;
+  applyFilters();
+  closeDetailedStats();
+}
+
+function renderDetailedStats() {
+  const perSurah   = new Map();   // surahNum -> { t1, t2, t3, total }
+  const pairCounts = new Map();   // "a-b" (a<b) -> count of pictures tagged with exactly that pair
+  let picT1 = 0, picT2 = 0, picT3 = 0; // picture counts by tag-count bucket (each picture counted once)
+
+  for (const name of allImages) {
+    const surahs = db[name]?.surahs || [];
+    const n = surahs.length;
+    if (n === 0) continue;
+    if (n === 1) picT1++;
+    else if (n === 2) picT2++;
+    else picT3++;
+    for (const s of surahs) {
+      const e = perSurah.get(s) || { t1: 0, t2: 0, t3: 0, total: 0 };
+      e.total++;
+      if (n === 1) e.t1++;
+      else if (n === 2) e.t2++;
+      else e.t3++;
+      perSurah.set(s, e);
+    }
+    if (n === 2) {
+      const [a, b] = [...surahs].sort((x, y) => x - y);
+      const key = `${a}-${b}`;
+      pairCounts.set(key, (pairCounts.get(key) || 0) + 1);
+    }
+  }
+
+  const surahRows = [...perSurah.entries()].sort((a, b) => b[1].total - a[1].total);
+  const pairRows  = [...pairCounts.entries()]
+    .map(([key, count]) => { const [a, b] = key.split('-').map(Number); return { a, b, count }; })
+    .sort((x, y) => y.count - x.count);
+  const suggestion = suggestSurahGroups(perSurah, pairRows);
+
+  document.getElementById('detailedStatsBody').innerHTML = `
+    <div>
+      <div class="stats-section-title">توزيع الصور حسب عدد الوسوم لكل سورة — ${surahRows.length} سورة موسومة</div>
+      ${surahRows.length ? `
+      <div class="dstats-table-wrap">
+        <table class="dstats-table">
+          <thead>
+            <tr>
+              <th>السورة</th>
+              <th class="num">وسم واحد</th>
+              <th class="num">وسمان</th>
+              <th class="num">3 وسوم فأكثر</th>
+              <th class="num">الإجمالي</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="dstats-total-row">
+              <td><strong>الإجمالي (كل الصور)</strong></td>
+              <td class="num"><strong>${picT1}</strong></td>
+              <td class="num"><strong>${picT2}</strong></td>
+              <td class="num"><strong>${picT3}</strong></td>
+              <td class="num"><strong>${picT1 + picT2 + picT3}</strong></td>
+            </tr>
+            ${surahRows.map(([num, e]) => `
+            <tr onclick="filterBySurahFromStats(${num})" title="عرض صور سورة ${SMAP.get(num) || ''}">
+              <td>${num}. ${SMAP.get(num) || ''}</td>
+              <td class="num">${e.t1}</td>
+              <td class="num">${e.t2}</td>
+              <td class="num">${e.t3}</td>
+              <td class="num"><strong>${e.total}</strong></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>` : `<div class="dstats-empty">لا توجد سور محددة بعد</div>`}
+    </div>
+    <div>
+      <div class="stats-section-title">أزواج السور المتكررة (الصور ذات وسمين فقط) — ${pairRows.length} زوج</div>
+      ${pairRows.length ? `
+      <div class="dstats-table-wrap">
+        <table class="dstats-table">
+          <thead>
+            <tr>
+              <th>السورة الأولى</th>
+              <th>السورة الثانية</th>
+              <th class="num">عدد الصور</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${pairRows.map(({ a, b, count }) => `
+            <tr onclick="filterByPairFromStats(${a},${b})" title="عرض الصور الموسومة بهاتين السورتين">
+              <td>${a}. ${SMAP.get(a) || ''}</td>
+              <td>${b}. ${SMAP.get(b) || ''}</td>
+              <td class="num">${count}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>` : `<div class="dstats-empty">لا توجد صور بوسمين حتى الآن</div>`}
+    </div>
+    <div>
+      <div class="stats-section-title">اقتراح تقسيم السور بين شخصين لتقليل التداخل</div>
+      ${suggestion ? `
+      <div class="dstats-groups-summary">
+        <div class="dstats-group-card">
+          <div class="dstats-group-title">المجموعة أ — ${suggestion.groupA.length} سورة، ${suggestion.loadA} صورة</div>
+          <div class="dstats-group-surahs">${suggestion.groupA.map(n => `<span class="surah-chip">${n}. ${SMAP.get(n) || ''}</span>`).join('')}</div>
+        </div>
+        <div class="dstats-group-card">
+          <div class="dstats-group-title">المجموعة ب — ${suggestion.groupB.length} سورة، ${suggestion.loadB} صورة</div>
+          <div class="dstats-group-surahs">${suggestion.groupB.map(n => `<span class="surah-chip">${n}. ${SMAP.get(n) || ''}</span>`).join('')}</div>
+        </div>
+      </div>
+      <div class="dstats-overlap-note">
+        صور بوسمين تتوزع سورتاها على المجموعتين (تحتاج مراجعة الطرفين): <strong>${suggestion.overlapCount}</strong>
+        من أصل ${pairRows.reduce((s, p) => s + p.count, 0)} صورة بوسمين${suggestion.overlapPairs.length ? '' : ' — لا يوجد تداخل ✓'}
+      </div>
+      ${suggestion.overlapPairs.length ? `
+      <div class="dstats-table-wrap" style="margin-top:10px">
+        <table class="dstats-table">
+          <thead>
+            <tr>
+              <th>السورة الأولى</th>
+              <th>السورة الثانية</th>
+              <th class="num">عدد الصور</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${suggestion.overlapPairs.map(({ a, b, count }) => `
+            <tr onclick="filterByPairFromStats(${a},${b})" title="عرض الصور المتداخلة">
+              <td>${a}. ${SMAP.get(a) || ''}</td>
+              <td>${b}. ${SMAP.get(b) || ''}</td>
+              <td class="num">${count}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>` : ''}
+      ` : `<div class="dstats-empty">لا توجد بيانات كافية لاقتراح تقسيم</div>`}
+    </div>
+  `;
+}
+
+// Suggests a 2-way split of surahs that minimizes 2-tag pictures whose two
+// surahs land in different groups, using the co-occurrence graph from pairRows
+// (surah = node, weight = shared-picture count). NP-hard in general (graph
+// bisection), so this uses a greedy construction + local-search (single-node
+// move) heuristic rather than an exact solver.
+function suggestSurahGroups(perSurah, pairRows) {
+  const nodes = [...perSurah.keys()];
+  if (nodes.length === 0) return null;
+
+  const adj = new Map(nodes.map(n => [n, []]));
+  for (const { a, b, count } of pairRows) {
+    adj.get(a).push({ other: b, weight: count });
+    adj.get(b).push({ other: a, weight: count });
+  }
+  const load = n => perSurah.get(n).total;
+
+  // Greedy initial assignment: process surahs by descending load, each joins
+  // whichever group it already shares more co-occurrence weight with (keeps
+  // tightly-linked surahs together); ties broken toward the lighter-loaded group.
+  const group = new Map();
+  let loadA = 0, loadB = 0;
+  for (const n of [...nodes].sort((x, y) => load(y) - load(x))) {
+    let wA = 0, wB = 0;
+    for (const { other, weight } of adj.get(n)) {
+      const g = group.get(other);
+      if (g === 'A') wA += weight; else if (g === 'B') wB += weight;
+    }
+    const g = wA !== wB ? (wA > wB ? 'A' : 'B') : (loadA <= loadB ? 'A' : 'B');
+    group.set(n, g);
+    if (g === 'A') loadA += load(n); else loadB += load(n);
+  }
+
+  const cutWeightOf = () => {
+    let c = 0;
+    for (const { a, b, count } of pairRows) if (group.get(a) !== group.get(b)) c += count;
+    return c;
+  };
+  // Cut weight dominates the score (x1000) so balance is only ever used as a
+  // tie-breaker between moves that don't change the overlap count.
+  const scoreOf = (cut, la, lb) => cut * 1000 + Math.abs(la - lb);
+
+  let improved = true, passes = 0;
+  while (improved && passes < 50) {
+    improved = false; passes++;
+    let cw = cutWeightOf();
+    for (const n of nodes) {
+      const g = group.get(n), other = g === 'A' ? 'B' : 'A';
+      let delta = 0;
+      for (const { other: nb, weight } of adj.get(n)) {
+        const ng = group.get(nb);
+        if (ng === g) delta += weight;
+        else if (ng === other) delta -= weight;
+      }
+      const nl = load(n);
+      const newLoadA = g === 'A' ? loadA - nl : loadA + nl;
+      const newLoadB = g === 'A' ? loadB + nl : loadB - nl;
+      if (scoreOf(cw + delta, newLoadA, newLoadB) < scoreOf(cw, loadA, loadB)) {
+        group.set(n, other);
+        loadA = newLoadA; loadB = newLoadB; cw += delta;
+        improved = true;
+      }
+    }
+  }
+
+  const groupA = nodes.filter(n => group.get(n) === 'A').sort((a, b) => a - b);
+  const groupB = nodes.filter(n => group.get(n) === 'B').sort((a, b) => a - b);
+  const overlapPairs = pairRows.filter(({ a, b }) => group.get(a) !== group.get(b)).sort((x, y) => y.count - x.count);
+  const overlapCount = overlapPairs.reduce((s, p) => s + p.count, 0);
+
+  return { groupA, groupB, loadA, loadB, overlapPairs, overlapCount };
 }
 
 // ═══════════════════════════════════════════════
 //  VIEW MODE
 // ═══════════════════════════════════════════════
-let vmIndex     = 0;
-let vmSurahs    = [];
-let vmStatus    = 'none';
-let vmPanelOpen = null;
-let vmTouchX    = 0;
-let vmTouchY    = 0;
+let vmIndex       = 0;
+let vmCurrentName = null;  // filename actually on screen — all writes use this, never raw vmIndex
+let vmSurahs      = [];
+let vmStatus      = 'none';
+let vmTouchX      = 0;
+let vmTouchY      = 0;
+
+function startReview() {
+  reviewMode = true;
+  // Jump to first unreviewed in filtered (or start of filtered)
+  const firstIdx = filtered.findIndex(n => !reviewedSet.has(n));
+  const name = filtered[firstIdx >= 0 ? firstIdx : 0];
+  if (!name) { showToast('لا توجد صور للمراجعة'); reviewMode = false; return; }
+  openViewMode(name);
+}
+
+function updateReviewBar() {
+  const total    = allImages.length;
+  const reviewed = allImages.filter(n => reviewedSet.has(n)).length;
+  const pct      = total ? Math.round(reviewed / total * 100) : 0;
+  document.getElementById('reviewProgressFill').style.width = pct + '%';
+  document.getElementById('reviewProgressText').textContent = `${reviewed} / ${total} — ${pct}%`;
+}
+
 
 function openViewMode(name) {
   const idx = filtered.indexOf(name);
   if (idx < 0) return;
   vmIndex = idx;
-  vmPanelOpen = null;
   renderViewMode();
+  document.getElementById('reviewBar').classList.toggle('hidden', !reviewMode);
+  if (reviewMode) updateReviewBar();
   document.getElementById('viewOverlay').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
 }
 
+function copyFilename() {
+  if (!vmCurrentName) return;
+  navigator.clipboard.writeText(vmCurrentName).then(() => showToast('تم نسخ اسم الملف ✓'));
+}
+
+function copyCardName(name) {
+  navigator.clipboard.writeText(name).then(() => showToast('تم نسخ اسم الملف ✓'));
+}
+
 function closeViewMode() {
+  reviewMode = false;
+  vmCurrentName = null;
+  document.getElementById('reviewBar').classList.add('hidden');
   document.getElementById('viewOverlay').classList.add('hidden');
   document.body.style.overflow = '';
-  if (vmPanelOpen) {
-    document.getElementById(vmPanelOpen)?.classList.add('hidden');
-    vmPanelOpen = null;
-  }
-  syncVActBtns();
   applyFilters();
 }
 
 function renderViewMode() {
   const name = filtered[vmIndex];
   if (!name) return;
-  const m = db[name] || {};
+  vmCurrentName = name;
+  const m   = db[name] || {};
+  const myS = myState(name);
   vmSurahs = [...(m.surahs || [])];
-  vmStatus = m.status || 'none';
+  vmStatus = myS.status || 'none';
 
   document.getElementById('viewFilename').textContent = name;
   document.getElementById('viewCounter').textContent  = `${vmIndex + 1} / ${filtered.length}`;
   document.getElementById('viewPrevBtn').disabled = vmIndex === 0;
   document.getElementById('viewNextBtn').disabled = vmIndex === filtered.length - 1;
+  document.getElementById('viewDeleteBtn').style.display = canDelete() ? '' : 'none';
 
   document.getElementById('viewImg').src = '';
   loadViewImg(name);
-  renderViewMeta(name);
+  if (reviewMode) { reviewedSet.add(name); updateReviewBar(); }
 
   const tagInp = document.getElementById('viewTagInput');
   if (tagInp) tagInp.value = '';
   renderViewTagBar();
 
-  if (vmPanelOpen === 'vp-surahs') renderVPSurahs();
-  if (vmPanelOpen === 'vp-flags')  renderVPFlags();
-  if (vmPanelOpen === 'vp-note')   renderVPNote();
+  const noteEl = document.getElementById('viewNoteInput');
+  noteEl.value = myS.notes || '';
+  autoResizeNote(noteEl);
+  document.getElementById('viewUnitsInput').value = myS.units || '';
+  renderViewStatusBtns();
+  renderViewOtherUsers();
 }
 
-function renderViewMeta(name) {
-  const m      = db[name] || {};
-  const note   = m.notes  || '';
-  const status = m.status || 'none';
-
-  const statusLabel = { none:'لم يُبدأ', partial:'جزئي', done:'منجز', improve:'يحتاج تحسين' }[status];
-  const statusColor = { none:'#9ca3af', partial:'#f59e0b', done:'#10b981', improve:'#ef4444' }[status];
-
-  const statusBadge = `<span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:${statusColor}22;border:1px solid ${statusColor}66;color:${statusColor}"><span style="width:7px;height:7px;border-radius:50%;background:${statusColor};flex-shrink:0;display:inline-block"></span>${statusLabel}</span>`;
-  let html = `<div class="view-surahs-row">${statusBadge}</div>`;
-  if (note) html += `<div class="view-note-text">${h(note)}</div>`;
-  document.getElementById('viewMeta').innerHTML = html;
-}
 
 async function loadViewImg(name) {
   let url = urlCache[name];
@@ -2321,38 +2667,132 @@ async function loadViewImg(name) {
 function viewNav(dir) {
   const next = vmIndex + dir;
   if (next < 0 || next >= filtered.length) return;
-  if (vmPanelOpen) {
-    document.getElementById(vmPanelOpen).classList.add('hidden');
-    vmPanelOpen = null;
-    syncVActBtns();
-  }
   vmIndex = next;
   renderViewMode();
 }
 
-function toggleVPanel(id) {
-  if (vmPanelOpen === id) { closeVPanel(); return; }
-  if (vmPanelOpen) document.getElementById(vmPanelOpen).classList.add('hidden');
-  vmPanelOpen = id;
-  document.getElementById(id).classList.remove('hidden');
-  syncVActBtns();
-  if (id === 'vp-surahs') { document.getElementById('vpTagInput').value = ''; renderVPSurahs(); setTimeout(() => document.getElementById('vpTagInput').focus(), 60); }
-  if (id === 'vp-flags')  renderVPFlags();
-  if (id === 'vp-note')   renderVPNote();
-  if (id === 'vp-filter') renderVPFilter();
+function buildViewStatusButtons() {
+  const ids = ['none', ...BUILTIN_STATUSES.map(t => t.id), ...customStatusTags.map(t => t.id)];
+  document.getElementById('viewStatusBtns').innerHTML = ids.map(id => {
+    const meta = statusMeta(id);
+    return `<button class="vsb" id="vsb-${id}" onclick="setViewStatus('${id}')">${h(meta.label)}</button>`;
+  }).join('');
+  renderViewStatusBtns();
 }
 
-function closeVPanel() {
-  if (vmPanelOpen) { document.getElementById(vmPanelOpen).classList.add('hidden'); vmPanelOpen = null; }
-  syncVActBtns();
+function renderViewStatusBtns() {
+  ['none', ...BUILTIN_STATUSES.map(t => t.id)].forEach(id => {
+    const btn = document.getElementById('vsb-' + id);
+    if (btn) btn.className = 'vsb' + (vmStatus === id ? ' vsb-active-' + id : '');
+  });
+  customStatusTags.forEach(t => {
+    const btn = document.getElementById('vsb-' + t.id);
+    if (!btn) return;
+    const active = vmStatus === t.id;
+    btn.style.borderColor = active ? t.color : '';
+    btn.style.background  = active ? hexToRgba(t.color, .15) : '';
+    btn.style.color       = active ? t.color : '';
+  });
 }
 
-function syncVActBtns() {
-  const map = { 'vp-filter':'vaBtnFilter', 'vp-surahs':'vaBtnSurahs', 'vp-flags':'vaBtnFlags', 'vp-note':'vaBtnNote' };
-  for (const [pid, bid] of Object.entries(map)) {
-    document.getElementById(bid)?.classList.toggle('active', vmPanelOpen === pid);
+async function setViewStatus(s) {
+  const name = vmCurrentName; if (!name) return;
+  vmStatus = s;
+  setMyState(name, { status: s });
+  await writeStatesDB();
+  renderViewStatusBtns();
+  renderViewOtherUsers();
+}
+
+async function saveViewNote() {
+  const name = vmCurrentName; if (!name) return;
+  const note = document.getElementById('viewNoteInput').value.trim();
+  if (getState(currentUser, name).notes === note) return;
+  setMyState(name, { notes: note });
+  await writeStatesDB();
+}
+
+function sanitizeUnits(val) {
+  const n = parseFloat(val);
+  if (isNaN(n) || n < 0) return 0;
+  return Math.round(n * 2) / 2; // round to nearest .5
+}
+
+async function saveViewUnits() {
+  const name = vmCurrentName; if (!name) return;
+  const units = sanitizeUnits(document.getElementById('viewUnitsInput').value);
+  document.getElementById('viewUnitsInput').value = units || '';
+  setMyState(name, { units });
+  await writeStatesDB();
+}
+
+function autoResizeNote(el) {
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
+
+function renderViewOtherUsers() {
+  const name = vmCurrentName; if (!name) return;
+  const others = Object.keys(USERS).filter(u => u !== currentUser);
+
+  const realState = (u, n) => (allUserStates[u] || {})[n] || null;
+
+  const bar = document.getElementById('vmOtherBar');
+  if (bar) {
+    bar.innerHTML = others.map(u => {
+      const s = realState(u, name);
+      const st = s?.status || 'none';
+      const meta = st === 'none' ? { label: 'لم يُبدأ', color: '#475569' } : statusMeta(st);
+      const units = s?.units ? `<span style="color:#94a3b8;margin-right:4px">(${s.units} وحدة)</span>` : '';
+      return `<span class="vm-user-status-item">
+        <span class="vm-user-initial" style="background:${USERS[u].color}">${USERS[u].label}</span>
+        <span style="color:${meta.color}">${h(meta.label)}</span>${units}
+      </span>`;
+    }).join('');
+    bar.classList.remove('hidden');
+  }
+
+  const notesEl = document.getElementById('vmOtherNotes');
+  if (notesEl) {
+    const rows = others.map(u => ({ u, notes: realState(u, name)?.notes })).filter(x => x.notes);
+    notesEl.innerHTML = rows.map(({ u, notes }) =>
+      `<div class="vm-user-note-row">
+        <span class="vm-user-note-label" style="color:${USERS[u].color}">${USERS[u].label}:</span>
+        <span>${h(notes)}</span>
+      </div>`).join('');
+    notesEl.classList.toggle('hidden', !rows.length);
   }
 }
+
+function switchUser(user) {
+  if (!USERS[user]) return;
+  currentUser = user;
+  localStorage.setItem('pictool-user', user);
+  updateUserSelector();
+  applyFilters();
+  if (vmCurrentName) {
+    const myS = myState(vmCurrentName);
+    vmStatus = myS.status || 'none';
+    const noteEl = document.getElementById('viewNoteInput');
+    noteEl.value = myS.notes || '';
+    autoResizeNote(noteEl);
+    renderViewStatusBtns();
+    renderViewOtherUsers();
+  }
+}
+
+function updateUserSelector() {
+  Object.keys(USERS).forEach(u => {
+    const btn = document.getElementById('uBtn-' + u);
+    if (!btn) return;
+    const isActive = u === currentUser;
+    btn.classList.toggle('active', isActive);
+    btn.style.background = isActive ? USERS[u].color : '';
+    btn.textContent = USERS[u].label;
+  });
+  document.getElementById('reviewBtn').classList.toggle('hidden', !canManage());
+}
+
 
 // ─ Suggestion list keyboard navigation ─
 function sugMoveHi(dropId, dir) {
@@ -2374,9 +2814,11 @@ function sugMoveHi(dropId, dir) {
 function renderViewTagBar() {
   const q = (document.getElementById('viewTagInput')?.value || '').trim().toLowerCase();
 
+  const xBtn = canEditTags() ? `<span class="vp-chip-x" onclick="event.stopPropagation();viewRemoveSurah(PLACEHOLDER)">×</span>` : '';
   document.getElementById('viewTagChips').innerHTML = vmSurahs.map(n =>
-    `<span class="vp-surah-chip-dark">${n}. ${SMAP.get(n)}<span class="vp-chip-x" onclick="event.stopPropagation();viewRemoveSurah(${n})">×</span></span>`
+    `<span class="vp-surah-chip-dark">${n}. ${SMAP.get(n)}${xBtn.replace('PLACEHOLDER', n)}</span>`
   ).join('');
+  document.getElementById('viewTagInput').style.display = canEditTags() ? '' : 'none';
 
   const drop = document.getElementById('viewSugDrop');
   if (!q) { drop.classList.add('hidden'); drop.innerHTML = ''; return; }
@@ -2397,12 +2839,12 @@ function renderViewTagBar() {
 }
 
 async function viewAddSurah(num) {
+  if (!canEditTags()) return;
   if (!vmSurahs.includes(num)) { vmSurahs.push(num); vmSurahs.sort((a, b) => a - b); }
-  const name = filtered[vmIndex];
+  const name = vmCurrentName;
   if (name) {
     db[name] = { ...(db[name] || {}), surahs: [...vmSurahs] };
-    await writeDB();
-    renderViewMeta(name);
+    await writeTagsDB();
   }
   document.getElementById('viewTagInput').value = '';
   renderViewTagBar();
@@ -2410,12 +2852,12 @@ async function viewAddSurah(num) {
 }
 
 async function viewRemoveSurah(num) {
+  if (!canEditTags()) return;
   vmSurahs = vmSurahs.filter(n => n !== num);
-  const name = filtered[vmIndex];
+  const name = vmCurrentName;
   if (name) {
     db[name] = { ...(db[name] || {}), surahs: [...vmSurahs] };
-    await writeDB();
-    renderViewMeta(name);
+    await writeTagsDB();
   }
   renderViewTagBar();
   document.getElementById('viewTagInput').focus();
@@ -2438,116 +2880,13 @@ function initViewTagInput() {
     }
   });
   document.addEventListener('click', e => {
-    if (!e.target.closest('#viewTagBar')) {
+    if (!e.target.closest('#viewTagArea')) {
       const drop = document.getElementById('viewSugDrop');
       if (drop) { drop.classList.add('hidden'); drop.innerHTML = ''; }
     }
   });
 }
 
-// ─ Surah panel ─
-function renderVPSurahs() {
-  const q = (document.getElementById('vpTagInput').value || '').toLowerCase().trim();
-
-  document.getElementById('vpTagChips').innerHTML = vmSurahs.map(n =>
-    `<span class="vp-surah-chip-dark">${n}. ${SMAP.get(n)}<span class="vp-chip-x" onclick="event.stopPropagation();vpRemoveSurah(${n})">×</span></span>`
-  ).join('');
-
-  const nq = normalizeAr(q);
-  const matches = q
-    ? SURAHS.filter(([num, name]) => normalizeAr(name).includes(nq) || String(num).startsWith(q))
-    : SURAHS;
-
-  let hiSet = false;
-  document.getElementById('vpSugList').innerHTML = matches.map(([num, name]) => {
-    const isSel = vmSurahs.includes(num);
-    const isHi  = !isSel && !hiSet ? (hiSet = true, true) : false;
-    return `<div class="vp-sug-item${isSel ? ' vp-sug-sel' : isHi ? ' vp-sug-hi' : ''}" data-num="${num}" onclick="${isSel ? '' : `vpAddSurah(${num})`}">
-      <span class="vp-sug-num">${num}</span>${name}${isSel ? '<span class="vp-sug-check">✓</span>' : ''}
-    </div>`;
-  }).join('');
-
-  updateVPSurahCount();
-}
-
-function vpAddSurah(num) {
-  if (!vmSurahs.includes(num)) { vmSurahs.push(num); vmSurahs.sort((a, b) => a - b); }
-  document.getElementById('vpTagInput').value = '';
-  renderVPSurahs();
-  document.getElementById('vpTagInput').focus();
-}
-
-function vpRemoveSurah(num) {
-  vmSurahs = vmSurahs.filter(n => n !== num);
-  renderVPSurahs();
-  document.getElementById('vpTagInput').focus();
-}
-
-function updateVPSurahCount() {
-  document.getElementById('vpSurahCount').textContent = vmSurahs.length ? `${vmSurahs.length} سورة` : '';
-}
-async function saveVPSurahs() {
-  const name = filtered[vmIndex]; if (!name) return;
-  db[name] = { ...(db[name]||{}), surahs: [...vmSurahs] };
-  await writeDB(); renderViewMeta(name); closeVPanel(); showToast('تم الحفظ ✓');
-}
-
-// ─ Flags panel ─
-function renderVPFlags() {
-  ['none','partial','done','improve'].forEach(s => {
-    document.getElementById('vpOpt'+cap(s)).className = 'status-opt' + (vmStatus===s ? ' sel-'+s : '');
-  });
-}
-function setVStatus(s) { vmStatus = s; renderVPFlags(); }
-async function saveVPFlags() {
-  const name = filtered[vmIndex]; if (!name) return;
-  db[name] = { ...(db[name]||{}), status: vmStatus };
-  await writeDB(); renderViewMeta(name); closeVPanel(); showToast('تم الحفظ ✓');
-}
-
-// ─ Note panel ─
-function renderVPNote() {
-  document.getElementById('vpNoteText').value = (db[filtered[vmIndex]]||{}).notes || '';
-}
-async function saveVPNote() {
-  const name = filtered[vmIndex]; if (!name) return;
-  db[name] = { ...(db[name]||{}), notes: document.getElementById('vpNoteText').value.trim() };
-  await writeDB(); renderViewMeta(name); closeVPanel(); showToast('تم الحفظ ✓');
-}
-
-// ─ Filter panel ─
-function renderVPFilter() {
-  const cur      = document.getElementById('fStatus').value;
-  const untagged = document.getElementById('fUntagged').checked;
-  const statuses = [
-    {v:'all',l:'الكل'},{v:'none',l:'لم يُبدأ'},{v:'partial',l:'جزئي'},{v:'done',l:'منجز'},{v:'improve',l:'يحتاج تحسين'}
-  ];
-  document.getElementById('vpFilterBody').innerHTML = `
-    <div class="vp-filter-row">
-      <div class="vp-filter-group">
-        <div class="vp-filter-label">الحالة</div>
-        <div class="vp-status-opts">
-          ${statuses.map(s=>`<button class="vp-status-opt${cur===s.v?' active':''}" onclick="setVPStatus('${s.v}')">${s.l}</button>`).join('')}
-        </div>
-      </div>
-      <div class="vp-filter-group">
-        <div class="vp-filter-checks">
-          <label class="vp-filter-check"><input type="checkbox" id="vpFUntagged" ${untagged?'checked':''}><span>غير موسومة فقط</span></label>
-        </div>
-      </div>
-    </div>`;
-  document.getElementById('vpFUntagged').onchange = e => {
-    document.getElementById('fUntagged').checked = e.target.checked;
-    applyFilters(); clampVmIndex(); renderViewMode(); renderVPFilter();
-  };
-}
-function setVPStatus(v) {
-  document.getElementById('fStatus').value = v;
-  applyFilters(); clampVmIndex(); renderViewMode(); renderVPFilter();
-}
-function clearFiltersFromView() {
-  clearFilters(); clampVmIndex(); renderViewMode(); renderVPFilter();
-}
 function clampVmIndex() {
   if (!filtered.length) { closeViewMode(); return; }
   vmIndex = Math.min(vmIndex, filtered.length - 1);
@@ -2555,7 +2894,7 @@ function clampVmIndex() {
 
 // ─ Delete / editor from view ─
 async function deleteFromView() {
-  const name = filtered[vmIndex]; if (!name) return;
+  const name = vmCurrentName; if (!name) return;
   if (!confirm(`هل تريد حذف هذه الصورة نهائياً؟\n${name}`)) return;
   try {
     await dirHandle.removeEntry(name);
@@ -2570,7 +2909,7 @@ async function deleteFromView() {
   } catch(e) { alert('تعذّر الحذف: ' + e.message); }
 }
 function openEditorFromView() {
-  const name = filtered[vmIndex]; if (!name) return;
+  const name = vmCurrentName; if (!name) return;
   mFile = name; openEditor();
 }
 
@@ -2590,22 +2929,6 @@ function initViewTouchEvents() {
 // ═══════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════
-function initVPTagInput() {
-  const inp = document.getElementById('vpTagInput');
-  inp.addEventListener('input', renderVPSurahs);
-  inp.addEventListener('keydown', e => {
-    if (e.key === 'ArrowDown') { e.preventDefault(); sugMoveHi('vpSugList', 1); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); sugMoveHi('vpSugList', -1); }
-    else if (e.key === 'Enter') {
-      e.preventDefault();
-      const hi = document.querySelector('#vpSugList .vp-sug-hi');
-      if (hi) vpAddSurah(parseInt(hi.dataset.num));
-    } else if (e.key === 'Backspace' && !inp.value && vmSurahs.length) {
-      vpRemoveSurah(vmSurahs[vmSurahs.length - 1]);
-    }
-  });
-}
-
 async function init() {
   if (!window.showDirectoryPicker) {
     document.querySelector('.welcome-card p').textContent =
@@ -2616,9 +2939,7 @@ async function init() {
     return;
   }
   initEditorEvents();
-  initClickModeSelect();
   initViewTouchEvents();
-  initVPTagInput();
   initViewTagInput();
   try {
     const saved = await idbGet('dir');

@@ -1,0 +1,2172 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>بيكتول – منظّم لقطات القرآن</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:          #f0f2f5;
+  --surface:     #ffffff;
+  --border:      #e2e5ea;
+  --text:        #1a1a2e;
+  --muted:       #6b7280;
+  --primary:     #2563eb;
+  --primary-h:   #1d4ed8;
+  --primary-lt:  #eff6ff;
+  --s-none:      #9ca3af;
+  --s-partial:   #f59e0b;
+  --s-done:      #10b981;
+  --s-improve:   #ef4444;
+  --s-none-bg:   #f9fafb;
+  --s-partial-bg:#fffbeb;
+  --s-done-bg:   #f0fdf4;
+  --s-improve-bg:#fef2f2;
+  --card-w:      220px;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 14px;
+}
+
+/* ── HEADER ─────────────────────────────── */
+.header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 18px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+.logo { font-size: 17px; font-weight: 700; color: var(--primary); }
+.folder-name {
+  font-size: 13px; color: var(--text);
+  flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  direction: ltr; text-align: right;
+  font-family: 'Segoe UI', monospace;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 6px; padding: 3px 10px;
+  max-width: 400px;
+}
+.header-actions { display: flex; gap: 8px; }
+
+/* ── FILTER BAR ─────────────────────────── */
+.filterbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 9px 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  position: sticky;
+  top: 52px;
+  z-index: 49;
+}
+.filter-label { font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.filter-sep { width: 1px; height: 22px; background: var(--border); flex-shrink: 0; margin: 0 4px; }
+
+/* size slider */
+.size-ctrl { display: flex; align-items: center; gap: 6px; }
+.size-btn {
+  width: 26px; height: 26px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--surface);
+  cursor: pointer; font-size: 16px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text);
+}
+.size-btn:hover { background: var(--bg); }
+.size-slider {
+  -webkit-appearance: none;
+  width: 90px; height: 4px;
+  border-radius: 2px; background: var(--border);
+  outline: none; cursor: pointer;
+}
+.size-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--primary); cursor: pointer;
+}
+
+/* ── STATS BAR ──────────────────────────── */
+.statsbar {
+  padding: 7px 20px;
+  font-size: 12px; color: var(--muted);
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+}
+.stat-pill { display: inline-flex; align-items: center; gap: 4px; font-weight: 500; }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+
+/* ── BUTTONS ─────────────────────────────── */
+.btn {
+  padding: 6px 13px; border-radius: 7px; border: none;
+  cursor: pointer; font-size: 13px; font-weight: 500;
+  transition: background .12s; white-space: nowrap;
+  font-family: inherit;
+}
+.btn:disabled { opacity: .5; cursor: default; }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--primary-h); }
+.btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+.btn-ghost:hover:not(:disabled) { background: var(--bg); }
+.btn-danger { background: transparent; border: 1px solid var(--s-improve); color: var(--s-improve); }
+.btn-danger:hover:not(:disabled) { background: var(--s-improve); color: #fff; }
+
+/* ── SELECT ─────────────────────────────── */
+select {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px; font-size: 13px;
+  background: var(--surface); color: var(--text);
+  cursor: pointer; outline: none; font-family: inherit;
+}
+select:focus { border-color: var(--primary); }
+
+/* ── MULTI-SELECT ────────────────────────── */
+.ms-wrap { position: relative; }
+.ms-btn {
+  display: flex; align-items: center; gap: 4px;
+  padding: 5px 10px;
+  border: 1px solid var(--border); border-radius: 7px;
+  background: var(--surface); cursor: pointer;
+  min-width: 160px; max-width: 380px;
+  flex-wrap: wrap; font-size: 13px; user-select: none;
+}
+.ms-btn:hover { border-color: #aaa; }
+.ms-btn.open { border-color: var(--primary); }
+.ms-ph { color: var(--muted); }
+.ms-arrow { margin-inline-start: auto; color: var(--muted); font-size: 11px; flex-shrink: 0; }
+
+.tag {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 7px; border-radius: 5px; font-size: 11px;
+  font-weight: 500; background: var(--primary); color: #fff;
+}
+.tag-x { cursor: pointer; opacity: .7; font-size: 13px; line-height: 1; }
+.tag-x:hover { opacity: 1; }
+
+.ms-dropdown {
+  position: absolute; top: calc(100% + 4px);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; box-shadow: 0 8px 28px rgba(0,0,0,.13);
+  z-index: 200; width: 270px; overflow: hidden;
+  display: flex; flex-direction: column;
+}
+/* open to the right side in RTL (so it doesn't go offscreen) */
+.ms-dropdown { right: 0; }
+
+.ms-search-wrap { padding: 9px 9px 6px; border-bottom: 1px solid var(--border); }
+.ms-search {
+  width: 100%; padding: 6px 10px;
+  border: 1px solid var(--border); border-radius: 6px;
+  font-size: 13px; outline: none; font-family: inherit;
+  direction: rtl;
+}
+.ms-search:focus { border-color: var(--primary); }
+
+.ms-list { overflow-y: auto; max-height: 270px; }
+.ms-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 13px; cursor: pointer; font-size: 13px;
+  transition: background .08s;
+}
+.ms-item:hover { background: #f5f8ff; }
+.ms-item.selected { background: var(--primary-lt); }
+.ms-item input[type=checkbox] { pointer-events: none; accent-color: var(--primary); flex-shrink: 0; }
+.ms-num { color: var(--muted); width: 28px; font-size: 12px; flex-shrink: 0; direction: ltr; }
+
+/* ── IMAGE GRID ──────────────────────────── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--card-w), 1fr));
+  gap: 14px;
+  padding: 16px 18px;
+}
+
+.card {
+  background: var(--surface);
+  border-radius: 10px;
+  border: 2px solid var(--border);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform .13s, box-shadow .13s, border-color .13s;
+  position: relative;
+  display: flex; flex-direction: column;
+}
+.card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,.1); border-color: #c7d2fe; }
+.card.s-partial  { border-color: var(--s-partial);  }
+.card.s-done     { border-color: var(--s-done);     }
+.card.s-improve  { border-color: var(--s-improve);  }
+
+/* Full image display — no cropping */
+.card-img-wrap {
+  width: 100%;
+  background: #f3f4f6;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.card-img-wrap img {
+  width: 100%; height: auto;
+  display: block; object-fit: contain;
+}
+.card-img-placeholder {
+  width: 100%; padding: 32px 0;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--muted); font-size: 12px;
+}
+
+.status-badge {
+  position: absolute; top: 7px; right: 7px;
+  padding: 2px 8px; border-radius: 20px;
+  font-size: 10px; font-weight: 700;
+  color: #fff; letter-spacing: .2px;
+}
+.badge-partial { background: var(--s-partial); }
+.badge-done    { background: var(--s-done);    }
+.badge-improve { background: var(--s-improve); }
+
+.card-body { padding: 9px 10px; }
+.card-name {
+  font-size: 11px; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  margin-bottom: 6px; direction: ltr; text-align: left;
+}
+.card-tags { display: flex; flex-wrap: wrap; gap: 3px; }
+.surah-chip {
+  background: var(--primary-lt); color: var(--primary);
+  border: 1px solid #bfdbfe;
+  padding: 2px 6px; border-radius: 4px;
+  font-size: 10px; font-weight: 500;
+}
+.card-note {
+  margin-top: 5px; font-size: 10px; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-style: italic;
+}
+
+/* ── WELCOME / EMPTY ─────────────────────── */
+.centered { display: flex; align-items: center; justify-content: center; min-height: 70vh; padding: 20px; }
+.welcome-card {
+  background: var(--surface); border-radius: 16px;
+  border: 1px solid var(--border); padding: 48px 40px;
+  max-width: 440px; text-align: center;
+  box-shadow: 0 4px 24px rgba(0,0,0,.06);
+}
+.welcome-card h1 { font-size: 22px; margin-bottom: 10px; }
+.welcome-card p { font-size: 13px; color: var(--muted); line-height: 1.7; margin-bottom: 22px; }
+.welcome-note { margin-top: 14px; font-size: 11px; color: #aaa; }
+.empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+.empty-state h2 { font-size: 18px; margin-bottom: 8px; }
+.empty-state p  { font-size: 13px; margin-bottom: 18px; }
+
+/* ── MODAL ───────────────────────────────── */
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.55);
+  z-index: 300; display: flex;
+  align-items: center; justify-content: center;
+  padding: 16px; backdrop-filter: blur(2px);
+}
+.modal {
+  background: var(--surface); border-radius: 14px;
+  width: min(960px, 94vw); max-height: 90vh;
+  display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0,0,0,.25);
+}
+.modal-header {
+  padding: 13px 17px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+}
+.modal-title {
+  font-size: 13px; font-weight: 600; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  flex: 1; direction: ltr; text-align: right;
+}
+.modal-body { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+.modal-img-panel {
+  flex: 1; background: #111; overflow: auto;
+  display: flex; align-items: center; justify-content: center;
+  padding: 12px; min-width: 0;
+}
+.modal-img-panel img { max-width: 100%; max-height: 72vh; object-fit: contain; border-radius: 4px; }
+.modal-form {
+  width: 275px; flex-shrink: 0;
+  border-inline-start: 1px solid var(--border);
+  padding: 18px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 18px;
+}
+.form-group { display: flex; flex-direction: column; gap: 7px; }
+.form-label { font-size: 12px; font-weight: 700; color: var(--text); }
+
+/* Status options */
+.status-grid { display: flex; flex-direction: column; gap: 6px; }
+.status-opt {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 11px; border: 2px solid var(--border);
+  border-radius: 8px; cursor: pointer; font-size: 13px;
+  transition: all .1s; font-family: inherit;
+  background: none; text-align: right; width: 100%;
+}
+.status-opt:hover { border-color: #ccc; }
+.status-opt.sel-none    { border-color: var(--s-none);    background: var(--s-none-bg);    }
+.status-opt.sel-partial { border-color: var(--s-partial); background: var(--s-partial-bg); }
+.status-opt.sel-done    { border-color: var(--s-done);    background: var(--s-done-bg);    }
+.status-opt.sel-improve { border-color: var(--s-improve); background: var(--s-improve-bg); }
+.status-ind { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+
+textarea {
+  width: 100%; padding: 8px 10px;
+  border: 1px solid var(--border); border-radius: 7px;
+  font-size: 13px; font-family: inherit;
+  resize: vertical; min-height: 85px;
+  outline: none; line-height: 1.5; color: var(--text);
+  direction: rtl;
+}
+textarea:focus { border-color: var(--primary); }
+
+.modal-footer {
+  padding: 12px 17px; border-top: 1px solid var(--border);
+  display: flex; justify-content: flex-start; gap: 8px;
+}
+/* danger on the far end */
+.modal-footer .spacer { flex: 1; }
+
+/* ── IMAGE EDITOR ────────────────────────── */
+.editor-overlay {
+  position: fixed; inset: 0;
+  background: #12151f;
+  z-index: 400; display: flex; flex-direction: column;
+}
+.editor-toolbar {
+  background: #1e2433; border-bottom: 1px solid #2d3748;
+  padding: 9px 14px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.tool-btn {
+  padding: 6px 13px; border-radius: 6px;
+  border: 1px solid #4a5568; background: transparent;
+  color: #e2e8f0; cursor: pointer; font-size: 13px;
+  font-weight: 500; transition: all .12s; white-space: nowrap;
+  font-family: inherit;
+}
+.tool-btn:hover { background: #2d3748; }
+.tool-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.tool-btn.save-btn { background: var(--s-done); border-color: var(--s-done); color: #fff; }
+.tool-btn.save-btn:hover { background: #059669; }
+.tool-btn.crop-apply { background: var(--s-partial); border-color: var(--s-partial); color: #fff; }
+.tool-sep { width: 1px; height: 22px; background: #4a5568; flex-shrink: 0; }
+.tool-spacer { flex: 1; }
+.tool-label { font-size: 12px; color: #94a3b8; }
+
+input[type=color] {
+  width: 30px; height: 28px; border-radius: 6px;
+  border: 1px solid #4a5568; cursor: pointer; padding: 1px;
+  background: #2d3748;
+}
+input[type=range].pen-size {
+  width: 80px; height: 4px; accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.editor-body {
+  flex: 1; overflow: auto; min-height: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px; position: relative;
+}
+#editorCanvas {
+  display: block; cursor: crosshair;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.1);
+}
+#cropBox {
+  position: absolute;
+  border: 2px dashed rgba(255,255,255,.85);
+  pointer-events: none;
+  display: none;
+  box-shadow: 0 0 0 9999px rgba(0,0,0,.45);
+}
+
+/* ── UTILS ───────────────────────────────── */
+.hidden { display: none !important; }
+.toast {
+  position: fixed; bottom: 20px; left: 20px;
+  background: #1e293b; color: #fff;
+  padding: 9px 16px; border-radius: 8px;
+  font-size: 13px; z-index: 999;
+  opacity: 0; transition: opacity .2s; pointer-events: none;
+}
+.toast.show { opacity: 1; }
+
+/* ── QUICK-ASSIGN POPUP (long press) ─── */
+.qa-popup {
+  background: var(--surface); border-radius: 14px;
+  width: min(640px, 96vw); max-height: 88vh;
+  display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0,0,0,.28);
+}
+.qa-header {
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+}
+.qa-header-text { flex: 1; }
+.qa-header h3 { font-size: 15px; margin-bottom: 2px; }
+.qa-filename { font-size: 11px; color: var(--muted); direction: ltr; }
+.qa-search-wrap { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.qa-search {
+  width: 100%; padding: 6px 11px;
+  border: 1px solid var(--border); border-radius: 7px;
+  font-size: 13px; outline: none; font-family: inherit; direction: rtl;
+}
+.qa-search:focus { border-color: var(--primary); }
+
+/* surah tile grid */
+.qa-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: 6px; padding: 10px 12px;
+  overflow-y: auto; flex: 1;
+}
+.sg-tile {
+  padding: 6px 4px; border: 2px solid var(--border);
+  border-radius: 8px; cursor: pointer; text-align: center;
+  transition: all .1s; user-select: none;
+}
+.sg-tile:hover { border-color: var(--primary); background: var(--primary-lt); }
+.sg-tile.sel   { border-color: var(--primary); background: var(--primary); color: #fff; }
+.sg-num  { display: block; font-size: 10px; color: var(--muted); line-height: 1.2; }
+.sg-tile.sel .sg-num { color: rgba(255,255,255,.7); }
+.sg-name { display: block; font-size: 12px; font-weight: 600; line-height: 1.3; margin-top: 1px; }
+
+.qa-footer {
+  padding: 10px 14px; border-top: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+}
+.qa-count { font-size: 12px; color: var(--muted); margin-inline-start: auto; }
+
+/* long-press ripple hint */
+.card.lp-active { outline: 3px solid var(--primary); outline-offset: 2px; }
+
+
+/* ── CONTEXT MENU ───────────────────── */
+.ctx-menu {
+  position: fixed; z-index: 600;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 9px; box-shadow: 0 6px 24px rgba(0,0,0,.15);
+  min-width: 160px; overflow: hidden; padding: 4px 0;
+}
+.ctx-item {
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 16px; cursor: pointer; font-size: 13px;
+  transition: background .08s; white-space: nowrap;
+}
+.ctx-item:hover { background: var(--bg); }
+.ctx-item.danger { color: var(--s-improve); }
+.ctx-item.danger:hover { background: var(--s-improve-bg); }
+
+/* ── CHIP × BUTTON ──────────────────── */
+.chip-x {
+  margin-inline-start: 3px; cursor: pointer;
+  opacity: .55; font-size: 12px; line-height: 1;
+  vertical-align: middle;
+}
+.chip-x:hover { opacity: 1; color: var(--s-improve); }
+
+
+@media (max-width: 640px) {
+  .modal-body { flex-direction: column; }
+  .modal-form { width: 100%; border-inline-start: none; border-top: 1px solid var(--border); }
+}
+
+/* ── STATS OVERLAY ─────────────────────── */
+.stats-modal {
+  background: var(--surface); border-radius: 16px;
+  width: min(860px, 96vw); max-height: 90vh;
+  display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0,0,0,.2);
+}
+.stats-header {
+  padding: 14px 18px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+}
+.stats-title { font-size: 16px; font-weight: 700; flex: 1; }
+.stats-body  { overflow-y: auto; padding: 20px 18px; display: flex; flex-direction: column; gap: 24px; }
+.stats-section-title {
+  font-size: 12px; font-weight: 700; color: var(--muted);
+  letter-spacing: .4px; margin-bottom: 12px; text-transform: uppercase;
+}
+.stats-bar-wrap {
+  background: var(--border); border-radius: 6px; height: 12px;
+  overflow: hidden; display: flex; margin-bottom: 14px;
+}
+.stats-bar-seg { height: 100%; transition: width .3s; }
+.stats-status-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
+.stats-card {
+  border-radius: 10px; padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.stats-card.sc-done    { background: var(--s-done-bg);    border: 1px solid var(--s-done);    }
+.stats-card.sc-partial { background: var(--s-partial-bg); border: 1px solid var(--s-partial); }
+.stats-card.sc-improve { background: var(--s-improve-bg); border: 1px solid var(--s-improve); }
+.stats-card.sc-none    { background: var(--s-none-bg);    border: 1px solid var(--s-none);    }
+.stats-card.sc-total   { background: var(--primary-lt);   border: 1px solid #bfdbfe; }
+.stats-card-num   { font-size: 30px; font-weight: 700; line-height: 1; }
+.stats-card-label { font-size: 12px; color: var(--muted); }
+.stats-card-pct   { font-size: 11px; color: var(--muted); }
+.stats-surah-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 7px; }
+.stats-surah-card {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 6px; text-align: center;
+  cursor: pointer; transition: border-color .1s;
+}
+.stats-surah-card:hover { border-color: var(--primary); }
+.stats-surah-name  { font-size: 11px; font-weight: 600; line-height: 1.3; }
+.stats-surah-num   { font-size: 10px; color: var(--muted); margin-top: 1px; margin-bottom: 6px; }
+.surah-prog-bar {
+  display: flex; border-radius: 5px; overflow: hidden;
+  height: 26px; width: 100%;
+  font-size: 10px; font-weight: 700; color: #fff;
+}
+.surah-bar-done {
+  background: var(--s-done);
+  display: flex; align-items: center; justify-content: center;
+  min-width: 0; flex-shrink: 0; transition: width .3s;
+  overflow: hidden;
+}
+.surah-bar-todo {
+  background: var(--s-improve);
+  display: flex; align-items: center; justify-content: center;
+  min-width: 0; flex-shrink: 0; transition: width .3s;
+  overflow: hidden;
+}
+
+/* ── VIEW MODE ─────────────────────────── */
+.view-overlay {
+  position: fixed; inset: 0; background: #0d0d0d;
+  z-index: 350; display: flex; flex-direction: column;
+}
+.view-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px; background: rgba(0,0,0,.55);
+  flex-shrink: 0; min-height: 48px;
+}
+.view-hdr-btn {
+  background: rgba(255,255,255,.1); border: none; color: #e2e8f0;
+  width: 32px; height: 32px; border-radius: 8px; cursor: pointer;
+  font-size: 15px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.view-hdr-btn:hover { background: rgba(255,255,255,.22); }
+.view-filename {
+  flex: 1; font-size: 13px; color: #cbd5e1;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: ltr;
+}
+.view-counter { font-size: 12px; color: #475569; flex-shrink: 0; }
+
+.view-img-area {
+  flex: 1; position: relative; min-height: 0;
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+#viewImg {
+  max-width: 100%; max-height: 100%; object-fit: contain; display: block;
+  user-select: none; -webkit-user-drag: none; pointer-events: none;
+}
+.view-nav-btn {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  background: rgba(0,0,0,.4); border: none; color: #fff;
+  width: 40px; height: 60px; border-radius: 8px; cursor: pointer;
+  font-size: 26px; display: flex; align-items: center; justify-content: center;
+  transition: background .12s; z-index: 2;
+}
+.view-nav-btn:hover { background: rgba(0,0,0,.65); }
+.view-nav-btn:disabled { opacity: .15; pointer-events: none; }
+.view-prev-btn { left: 8px; }
+.view-next-btn { right: 8px; }
+.review-bar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 18px; background: #0f172a; border-bottom: 1px solid #1e293b; flex-shrink: 0;
+}
+.review-progress-track {
+  flex: 1; height: 8px; background: #1e293b; border-radius: 4px; overflow: hidden;
+}
+.review-progress-fill {
+  height: 100%; background: #10b981; border-radius: 4px; transition: width .3s ease; width: 0%;
+}
+.review-progress-text { font-size: 12px; color: #94a3b8; white-space: nowrap; }
+.review-exit-btn {
+  font-size: 12px; color: #94a3b8; background: none; border: 1px solid #334155;
+  border-radius: 6px; padding: 3px 10px; cursor: pointer; white-space: nowrap;
+}
+.review-exit-btn:hover { color: #e2e8f0; border-color: #94a3b8; }
+
+.view-controls-row {
+  display: flex; align-items: center; gap: 7px;
+  padding: 6px 8px; flex-shrink: 0;
+  background: rgba(0,0,0,.55);
+}
+.view-tag-area { flex: 1; position: relative; min-width: 0; }
+.view-tag-wrap {
+  border: 1px solid #374151; border-radius: 8px;
+  background: #111827; padding: 5px 8px;
+  display: flex; flex-wrap: wrap; gap: 5px;
+  cursor: text; min-height: 38px; align-items: center;
+  transition: border-color .12s;
+}
+.view-tag-wrap:focus-within { border-color: var(--primary); }
+.view-tag-input {
+  border: none; background: transparent; color: #e2e8f0;
+  font-size: 13px; font-family: inherit; outline: none;
+  flex: 1; min-width: 110px; direction: rtl; padding: 2px 0;
+}
+.view-tag-input::placeholder { color: #374151; }
+.view-sug-drop {
+  position: absolute; bottom: calc(100% + 2px); left: 0; right: 0;
+  background: #0f172a; border: 1px solid #1e293b;
+  border-radius: 10px; max-height: 230px; overflow-y: auto;
+  z-index: 20; box-shadow: 0 -8px 28px rgba(0,0,0,.6);
+}
+
+.vp-surah-chip-dark {
+  display: inline-flex; align-items: center; gap: 3px;
+  background: var(--primary); color: #fff;
+  padding: 3px 7px; border-radius: 5px;
+  font-size: 12px; font-weight: 500; white-space: nowrap;
+}
+.vp-chip-x {
+  cursor: pointer; opacity: .7; font-size: 14px; line-height: 1; padding: 0 1px;
+}
+.vp-chip-x:hover { opacity: 1; }
+.vp-sug-item {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 12px; cursor: pointer; font-size: 13px; color: #e2e8f0;
+  transition: background .07s; user-select: none;
+}
+.vp-sug-item:hover { background: rgba(255,255,255,.06); }
+.vp-sug-item.vp-sug-hi { background: rgba(37,99,235,.28); }
+.vp-sug-item.vp-sug-sel { color: #475569; cursor: default; pointer-events: none; }
+.vp-sug-num { font-size: 11px; color: #475569; width: 24px; flex-shrink: 0; direction: ltr; text-align: right; }
+.vp-sug-check { margin-inline-start: auto; color: var(--s-done); font-size: 12px; flex-shrink: 0; }
+
+.view-status-btns { display: flex; gap: 5px; flex-shrink: 0; flex-wrap: wrap; }
+.view-note-bar { padding: 3px 8px 6px; background: rgba(0,0,0,.55); }
+.view-note-input {
+  width: 100%; background: #1e293b; border: 1px solid #334155;
+  border-radius: 8px; color: #e2e8f0; font-size: 13px;
+  padding: 6px 12px; font-family: inherit; direction: rtl;
+  box-sizing: border-box; resize: none; overflow: hidden;
+  line-height: 1.5; min-height: 34px;
+}
+.view-note-input::placeholder { color: #475569; }
+.view-note-input:focus { outline: none; border-color: #475569; background: #0f172a; }
+.vsb {
+  font-size: 12px; font-weight: 600; padding: 5px 10px;
+  border-radius: 20px; border: 1.5px solid #334155;
+  background: transparent; color: #64748b; cursor: pointer;
+  transition: all .12s; white-space: nowrap; font-family: inherit;
+}
+.vsb:hover { border-color: #64748b; color: #cbd5e1; }
+.vsb.vsb-active-none    { border-color: #9ca3af; background: rgba(156,163,175,.15); color: #9ca3af; }
+.vsb.vsb-active-partial { border-color: #f59e0b; background: rgba(245,158,11,.15); color: #f59e0b; }
+.vsb.vsb-active-done    { border-color: #10b981; background: rgba(16,185,129,.15); color: #10b981; }
+.vsb.vsb-active-improve { border-color: #ef4444; background: rgba(239,68,68,.15); color: #ef4444; }
+.view-icon-btn {
+  width: 34px; height: 34px; border-radius: 8px;
+  border: 1px solid #334155; background: transparent;
+  color: #64748b; cursor: pointer; font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: all .12s;
+}
+.view-icon-btn:hover { background: rgba(255,255,255,.08); color: #e2e8f0; }
+.view-icon-btn.va-danger { border-color: rgba(239,68,68,.25); color: #f87171; }
+.view-icon-btn.va-danger:hover { background: rgba(239,68,68,.12); }
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<div id="appHeader" class="header hidden">
+  <span class="logo">📖 بيكتول</span>
+  <div class="header-actions">
+    <button class="btn btn-ghost" onclick="openStats()">📊 إحصائيات</button>
+    <button class="btn btn-ghost" onclick="startReview()">🔍 مراجعة</button>
+    <button class="btn btn-ghost" onclick="refreshImages()">↻ تحديث</button>
+    <button class="btn btn-ghost" onclick="openFolder()">تغيير المجلد</button>
+  </div>
+</div>
+
+<!-- ── FILTER BAR ── -->
+<div id="filterBar" class="filterbar hidden">
+  <span class="filter-label">السورة:</span>
+  <div class="ms-wrap" id="fWrap">
+    <div class="ms-btn" id="fBtn" onclick="toggleDrop('f')">
+      <span class="ms-ph" id="fPh">جميع السور</span>
+      <div id="fTags"></div>
+      <span class="ms-arrow">▾</span>
+    </div>
+    <div class="ms-dropdown hidden" id="fDrop">
+      <div class="ms-search-wrap">
+        <input class="ms-search" id="fSearch" type="text" placeholder="ابحث بالاسم أو الرقم…" oninput="renderDrop('f')">
+      </div>
+      <div class="ms-list" id="fList"></div>
+    </div>
+  </div>
+
+  <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;white-space:nowrap">
+    <input type="checkbox" id="fExactSurahs" onchange="applyFilters()">
+    <span style="font-weight:600;color:var(--muted)">السور المحددة فقط</span>
+  </label>
+
+  <span class="filter-sep"></span>
+
+  <span class="filter-label">الحالة:</span>
+  <select id="fStatus" onchange="applyFilters()">
+    <option value="all">الكل</option>
+    <option value="none">لم يُبدأ</option>
+    <option value="partial">منجز جزئياً</option>
+    <option value="done">منجز</option>
+    <option value="improve">يحتاج تحسين</option>
+  </select>
+
+  <span class="filter-sep"></span>
+
+  <span class="filter-label">الوسوم:</span>
+  <select id="fTagCount" onchange="applyFilters()">
+    <option value="">الكل</option>
+    <option value="0">غير موسومة</option>
+    <option value="1">سورة واحدة</option>
+  </select>
+
+  <span class="filter-sep"></span>
+
+  <span class="filter-label">الحجم:</span>
+  <div class="size-ctrl">
+    <button class="size-btn" onclick="adjustSize(-30)" title="تصغير">−</button>
+    <input class="size-slider" type="range" id="sizeSlider" min="120" max="1200" value="220" oninput="onSizeChange(this.value)">
+    <button class="size-btn" onclick="adjustSize(30)" title="تكبير">+</button>
+  </div>
+
+  <span class="filter-sep" style="margin-inline-start:auto"></span>
+  <button class="btn btn-ghost" onclick="clearFilters()">مسح الفلاتر</button>
+</div>
+
+<!-- ── STATS BAR ── -->
+<div id="statsBar" class="statsbar hidden">
+  <span id="statsText"></span>
+</div>
+
+<!-- ── WELCOME ── -->
+<div id="welcome" class="centered">
+  <div class="welcome-card">
+    <div style="font-size:52px;margin-bottom:16px">📖</div>
+    <h1>منظّم لقطات القرآن الكريم</h1>
+    <p>صنّف لقطات شاشة القرآن حسب السورة، وتابع التقدم بين المراجِعَين. بياناتك محفوظة في مجلدك الخاص ولا تُرسل لأي خادم.</p>
+    <button class="btn btn-primary" style="font-size:15px;padding:11px 28px" onclick="openFolder()">
+      فتح مجلد الصور
+    </button>
+    <p class="welcome-note">يعمل في Chrome أو Edge فقط. يتذكّر التطبيق مجلدك تلقائياً.</p>
+  </div>
+</div>
+
+<!-- ── GRID ── -->
+<div id="grid" class="grid hidden"></div>
+
+<!-- ── EMPTY STATE ── -->
+<div id="emptyState" class="empty-state hidden">
+  <h2>لا توجد صور مطابقة</h2>
+  <p>جرّب تعديل الفلاتر أو مسحها.</p>
+  <button class="btn btn-ghost" onclick="clearFilters()">مسح الفلاتر</button>
+</div>
+
+<!-- ── MODAL (view + tag) ── -->
+<div class="overlay hidden" id="modal" onclick="onOverlayClick(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modalTitle"></span>
+      <button class="btn btn-ghost" onclick="closeModal()">✕ إغلاق</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-img-panel">
+        <img id="modalImg" src="" alt="">
+      </div>
+      <div class="modal-form">
+
+        <div class="form-group">
+          <label class="form-label">السور في هذه الصورة</label>
+          <div class="ms-wrap" id="mWrap">
+            <div class="ms-btn" id="mBtn" onclick="toggleDrop('m')">
+              <span class="ms-ph" id="mPh">اختر السور…</span>
+              <div id="mTags"></div>
+              <span class="ms-arrow">▾</span>
+            </div>
+            <div class="ms-dropdown hidden" id="mDrop">
+              <div class="ms-search-wrap">
+                <input class="ms-search" id="mSearch" type="text" placeholder="ابحث…" oninput="renderDrop('m')">
+              </div>
+              <div class="ms-list" id="mList"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">الحالة</label>
+          <div class="status-grid">
+            <button class="status-opt" id="optNone"    onclick="setStatus('none')">
+              <div class="status-ind" style="background:var(--s-none)"></div>لم يُبدأ
+            </button>
+            <button class="status-opt" id="optPartial" onclick="setStatus('partial')">
+              <div class="status-ind" style="background:var(--s-partial)"></div>منجز جزئياً
+            </button>
+            <button class="status-opt" id="optDone"    onclick="setStatus('done')">
+              <div class="status-ind" style="background:var(--s-done)"></div>منجز
+            </button>
+            <button class="status-opt" id="optImprove" onclick="setStatus('improve')">
+              <div class="status-ind" style="background:var(--s-improve)"></div>يحتاج تحسين
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">ملاحظات</label>
+          <textarea id="modalNotes" placeholder="ملاحظات اختيارية…"></textarea>
+        </div>
+
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary"  onclick="saveImage()">حفظ</button>
+      <button class="btn btn-ghost"    onclick="openEditor()">✏ تعديل الصورة</button>
+      <button class="btn btn-ghost"    onclick="closeModal()">إلغاء</button>
+      <span class="spacer"></span>
+      <button class="btn btn-danger"   onclick="deleteImage()">🗑 حذف</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── IMAGE EDITOR ── -->
+<div id="editorOverlay" class="editor-overlay hidden">
+  <div class="editor-toolbar">
+    <button class="tool-btn active" id="btnPencil" onclick="setTool('pencil')">✏ قلم</button>
+    <div class="tool-sep"></div>
+    <span class="tool-label">اللون:</span>
+    <input type="color" id="penColor" value="#ff0000" title="لون القلم">
+    <span class="tool-label">الحجم:</span>
+    <input type="range" class="pen-size" id="penSize" min="1" max="40" value="4">
+    <div class="tool-sep"></div>
+    <button class="tool-btn" id="btnCrop" onclick="setTool('crop')">✂ قص</button>
+    <button class="tool-btn crop-apply hidden" id="applyCropBtn" onclick="applyCrop()">تطبيق القص</button>
+    <div class="tool-sep"></div>
+    <button class="tool-btn" onclick="editorUndo()" title="تراجع">↩ تراجع</button>
+    <div class="tool-spacer"></div>
+    <button class="tool-btn save-btn" onclick="saveEditorFile()">💾 حفظ الصورة</button>
+    <button class="tool-btn" onclick="closeEditor()">✕ إغلاق</button>
+  </div>
+  <div class="editor-body" id="editorBody">
+    <canvas id="editorCanvas"></canvas>
+    <div id="cropBox"></div>
+  </div>
+</div>
+
+<!-- ── QUICK ASSIGN POPUP ── -->
+<div class="overlay hidden" id="qaOverlay" onclick="onQAOverlay(event)">
+  <div class="qa-popup">
+    <div class="qa-header">
+      <div class="qa-header-text">
+        <h3>تحديد السور</h3>
+        <div class="qa-filename" id="qaFilename"></div>
+      </div>
+      <button class="btn btn-ghost" onclick="closeQA()" style="padding:4px 10px;flex-shrink:0">✕</button>
+    </div>
+    <div class="qa-search-wrap">
+      <input class="qa-search" id="qaSearch" type="text" placeholder="ابحث لتصفية السور…" oninput="renderQAList()">
+    </div>
+    <div class="qa-grid" id="qaList"></div>
+    <div class="qa-footer">
+      <button class="btn btn-primary" onclick="saveQA()">حفظ</button>
+      <button class="btn btn-ghost"   onclick="closeQA()">إلغاء</button>
+      <span class="qa-count" id="qaCount"></span>
+    </div>
+  </div>
+</div>
+
+<!-- ── CONTEXT MENU ── -->
+<div class="ctx-menu hidden" id="ctxMenu">
+  <div class="ctx-item danger" onclick="ctxDelete()">🗑 حذف الصورة</div>
+</div>
+
+<!-- ── STATS OVERLAY ── -->
+<div class="overlay hidden" id="statsOverlay" onclick="onStatsOverlayClick(event)">
+  <div class="stats-modal">
+    <div class="stats-header">
+      <span class="stats-title">📊 الإحصائيات الكاملة</span>
+      <button class="btn btn-ghost" onclick="closeStats()">✕ إغلاق</button>
+    </div>
+    <div class="stats-body" id="statsBody"></div>
+  </div>
+</div>
+
+<!-- ── VIEW MODE ── -->
+<div id="viewOverlay" class="view-overlay hidden">
+  <div class="view-header">
+    <button class="view-hdr-btn" onclick="closeViewMode()">✕</button>
+    <span class="view-filename" id="viewFilename"></span>
+    <span class="view-counter" id="viewCounter"></span>
+  </div>
+
+  <div id="reviewBar" class="review-bar hidden">
+    <div class="review-progress-track">
+      <div class="review-progress-fill" id="reviewProgressFill"></div>
+    </div>
+    <span id="reviewProgressText" class="review-progress-text"></span>
+    <button class="review-exit-btn" onclick="closeViewMode()">إنهاء المراجعة</button>
+  </div>
+
+  <div class="view-img-area" id="viewImgArea">
+    <img id="viewImg" src="" alt="" draggable="false">
+    <button class="view-nav-btn view-prev-btn" id="viewPrevBtn" onclick="viewNav(-1)">‹</button>
+    <button class="view-nav-btn view-next-btn" id="viewNextBtn" onclick="viewNav(1)">›</button>
+  </div>
+
+  <!-- Controls row: tag input + status buttons + icon actions -->
+  <div class="view-controls-row">
+    <div class="view-tag-area" id="viewTagArea">
+      <div class="view-tag-wrap" onclick="document.getElementById('viewTagInput').focus()">
+        <div id="viewTagChips"></div>
+        <input class="view-tag-input" id="viewTagInput" type="text" placeholder="أضف سورة…" autocomplete="off">
+      </div>
+      <div class="view-sug-drop hidden" id="viewSugDrop"></div>
+    </div>
+    <div class="view-status-btns">
+      <button class="vsb" id="vsb-none"    onclick="setViewStatus('none')">لم يُبدأ</button>
+      <button class="vsb" id="vsb-partial" onclick="setViewStatus('partial')">جزئي</button>
+      <button class="vsb" id="vsb-done"    onclick="setViewStatus('done')">منجز</button>
+      <button class="vsb" id="vsb-improve" onclick="setViewStatus('improve')">يحتاج تحسين</button>
+    </div>
+    <button class="view-icon-btn" onclick="openEditorFromView()" title="تعديل">✏</button>
+    <button class="view-icon-btn va-danger" onclick="deleteFromView()" title="حذف">🗑</button>
+  </div>
+
+  <!-- Notes row -->
+  <div class="view-note-bar">
+    <textarea class="view-note-input" id="viewNoteInput" placeholder="ملاحظة…" autocomplete="off" rows="1" onblur="saveViewNote()" oninput="autoResizeNote(this)"></textarea>
+  </div>
+</div>
+
+<!-- ── TOAST ── -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  SURAH DATA (Arabic names)
+// ═══════════════════════════════════════════════
+const SURAHS = [
+  [1,"الفاتحة"],[2,"البقرة"],[3,"آل عمران"],[4,"النساء"],
+  [5,"المائدة"],[6,"الأنعام"],[7,"الأعراف"],[8,"الأنفال"],
+  [9,"التوبة"],[10,"يونس"],[11,"هود"],[12,"يوسف"],
+  [13,"الرعد"],[14,"إبراهيم"],[15,"الحجر"],[16,"النحل"],
+  [17,"الإسراء"],[18,"الكهف"],[19,"مريم"],[20,"طه"],
+  [21,"الأنبياء"],[22,"الحج"],[23,"المؤمنون"],[24,"النور"],
+  [25,"الفرقان"],[26,"الشعراء"],[27,"النمل"],[28,"القصص"],
+  [29,"العنكبوت"],[30,"الروم"],[31,"لقمان"],[32,"السجدة"],
+  [33,"الأحزاب"],[34,"سبأ"],[35,"فاطر"],[36,"يس"],
+  [37,"الصافات"],[38,"ص"],[39,"الزمر"],[40,"غافر"],
+  [41,"فصلت"],[42,"الشورى"],[43,"الزخرف"],[44,"الدخان"],
+  [45,"الجاثية"],[46,"الأحقاف"],[47,"محمد"],[48,"الفتح"],
+  [49,"الحجرات"],[50,"ق"],[51,"الذاريات"],[52,"الطور"],
+  [53,"النجم"],[54,"القمر"],[55,"الرحمن"],[56,"الواقعة"],
+  [57,"الحديد"],[58,"المجادلة"],[59,"الحشر"],[60,"الممتحنة"],
+  [61,"الصف"],[62,"الجمعة"],[63,"المنافقون"],[64,"التغابن"],
+  [65,"الطلاق"],[66,"التحريم"],[67,"الملك"],[68,"القلم"],
+  [69,"الحاقة"],[70,"المعارج"],[71,"نوح"],[72,"الجن"],
+  [73,"المزمل"],[74,"المدثر"],[75,"القيامة"],[76,"الإنسان"],
+  [77,"المرسلات"],[78,"النبأ"],[79,"النازعات"],[80,"عبس"],
+  [81,"التكوير"],[82,"الانفطار"],[83,"المطففين"],[84,"الانشقاق"],
+  [85,"البروج"],[86,"الطارق"],[87,"الأعلى"],[88,"الغاشية"],
+  [89,"الفجر"],[90,"البلد"],[91,"الشمس"],[92,"الليل"],
+  [93,"الضحى"],[94,"الشرح"],[95,"التين"],[96,"العلق"],
+  [97,"القدر"],[98,"البينة"],[99,"الزلزلة"],[100,"العاديات"],
+  [101,"القارعة"],[102,"التكاثر"],[103,"العصر"],[104,"الهمزة"],
+  [105,"الفيل"],[106,"قريش"],[107,"الماعون"],[108,"الكوثر"],
+  [109,"الكافرون"],[110,"النصر"],[111,"المسد"],[112,"الإخلاص"],
+  [113,"الفلق"],[114,"الناس"]
+];
+const SMAP = new Map(SURAHS);
+const IMG_EXTS = new Set(['jpg','jpeg','png','webp','gif','bmp','avif','tif','tiff']);
+
+// ═══════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════
+let dirHandle = null;
+let db        = {};    // filename → { surahs, status, notes }
+let allImages = [];
+let filtered  = [];
+let urlCache  = {};
+let thumbObs  = null;
+
+let fSurahs   = [];    // filter: selected surahs
+
+// Modal
+let mFile = null, mSurahs = [], mStatus = 'none';
+
+// Editor
+let editorFile = null, editorHistory = [];
+let editorTool = 'pencil';
+let isDrawing  = false;
+let cropA = null, cropB = null, cropDragging = false;
+let editorCtx  = null;
+
+// ═══════════════════════════════════════════════
+//  INDEXEDDB
+// ═══════════════════════════════════════════════
+async function idb() {
+  return new Promise((res,rej) => {
+    const r = indexedDB.open('pictool_v2', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onsuccess = () => res(r.result);
+    r.onerror   = () => rej(r.error);
+  });
+}
+async function idbPut(k,v) { const d=await idb(); return new Promise((res,rej)=>{ const tx=d.transaction('kv','readwrite'); tx.objectStore('kv').put(v,k); tx.oncomplete=res; tx.onerror=()=>rej(tx.error); }); }
+async function idbGet(k)   { const d=await idb(); return new Promise((res,rej)=>{ const tx=d.transaction('kv','readonly'); const r=tx.objectStore('kv').get(k); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+
+// ═══════════════════════════════════════════════
+//  DATA.JSON
+// ═══════════════════════════════════════════════
+async function readDB() {
+  db = {};
+  try {
+    const fh = await dirHandle.getFileHandle('tags.json');
+    const tags = JSON.parse(await (await fh.getFile()).text()).images || {};
+    for (const [name, surahs] of Object.entries(tags))
+      db[name] = { ...(db[name] || {}), surahs: Array.isArray(surahs) ? surahs : [] };
+  } catch {}
+  try {
+    const fh = await dirHandle.getFileHandle('states.json');
+    const states = JSON.parse(await (await fh.getFile()).text()).images || {};
+    for (const [name, s] of Object.entries(states))
+      db[name] = { ...(db[name] || {}), status: s.status || 'none', notes: s.notes || '' };
+  } catch {}
+  // Migrate from old single data.json if no new files exist yet
+  if (!Object.keys(db).length) {
+    try {
+      const fh = await dirHandle.getFileHandle('data.json');
+      const old = JSON.parse(await (await fh.getFile()).text()).images || {};
+      for (const [name, m] of Object.entries(old))
+        db[name] = { surahs: m.surahs || [], status: m.status || 'none', notes: m.notes || '' };
+      if (Object.keys(db).length) { await writeTagsDB(); await writeStatesDB(); showToast('تم الترقية إلى صيغة الملفين ✓'); }
+    } catch {}
+  }
+}
+
+async function writeTagsDB() {
+  const images = {};
+  for (const [name, m] of Object.entries(db))
+    if (m.surahs && m.surahs.length) images[name] = m.surahs;
+  const fh = await dirHandle.getFileHandle('tags.json', { create: true });
+  const w  = await fh.createWritable();
+  await w.write(JSON.stringify({ version: 1, saved: new Date().toISOString(), images }, null, 2));
+  await w.close();
+}
+
+async function writeStatesDB() {
+  const images = {};
+  for (const [name, m] of Object.entries(db)) {
+    if ((m.status && m.status !== 'none') || m.notes)
+      images[name] = { status: m.status || 'none', notes: m.notes || '' };
+  }
+  const fh = await dirHandle.getFileHandle('states.json', { create: true });
+  const w  = await fh.createWritable();
+  await w.write(JSON.stringify({ version: 1, saved: new Date().toISOString(), images }, null, 2));
+  await w.close();
+}
+
+async function writeDB() {
+  await writeTagsDB();
+  await writeStatesDB();
+}
+
+let reviewedSet = new Set();
+let reviewMode  = false;
+
+// ═══════════════════════════════════════════════
+//  FOLDER
+// ═══════════════════════════════════════════════
+async function openFolder() {
+  if (!window.showDirectoryPicker) {
+    alert('هذا التطبيق يعمل في Chrome أو Edge فقط. يرجى فتح الملف في أحد هذين المتصفحَين.');
+    return;
+  }
+  try {
+    const h = await window.showDirectoryPicker({ mode: 'readwrite' });
+    dirHandle = h;
+    await idbPut('dir', h);
+    await loadApp();
+  } catch(e) {
+    if (e.name !== 'AbortError') alert('تعذّر فتح المجلد: ' + e.message);
+  }
+}
+
+async function loadApp() {
+  document.getElementById('welcome').classList.add('hidden');
+  ['appHeader','filterBar','statsBar','grid'].forEach(id => document.getElementById(id).classList.remove('hidden'));
+  await readDB();
+  await scanImages();
+  applyFilters();
+}
+
+async function scanImages() {
+  Object.values(urlCache).forEach(u => URL.revokeObjectURL(u));
+  urlCache = {};
+  allImages = [];
+  for await (const [name, handle] of dirHandle.entries()) {
+    if (handle.kind !== 'file') continue;
+    if (IMG_EXTS.has(name.split('.').pop().toLowerCase())) allImages.push(name);
+  }
+  allImages.sort((a,b) => a.localeCompare(b, undefined, { numeric: true }));
+}
+
+async function refreshImages() {
+  showToast('جاري التحديث…');
+  await readDB();
+  await scanImages();
+  applyFilters();
+  showToast('تم التحديث ✓');
+}
+
+// ═══════════════════════════════════════════════
+//  GRID
+// ═══════════════════════════════════════════════
+function onSizeChange(v) {
+  document.documentElement.style.setProperty('--card-w', v + 'px');
+}
+function adjustSize(delta) {
+  const sl = document.getElementById('sizeSlider');
+  sl.value = Math.min(1200, Math.max(120, parseInt(sl.value) + delta));
+  onSizeChange(sl.value);
+}
+
+function applyFilters() {
+  const sf         = document.getElementById('fStatus').value;
+  const tagCount   = document.getElementById('fTagCount').value;
+  const exactSurahs= document.getElementById('fExactSurahs').checked;
+  filtered = allImages.filter(name => {
+    const m      = db[name] || {};
+    const surahs = m.surahs || [];
+    if (tagCount === '0' && surahs.length !== 0) return false;
+    if (tagCount === '1' && surahs.length !== 1) return false;
+    if (sf !== 'all' && (m.status||'none') !== sf) return false;
+    if (fSurahs.length > 0) {
+      if (exactSurahs) {
+        if (surahs.length === 0) return false;
+        if (!surahs.every(s => fSurahs.includes(s))) return false;
+      } else {
+        if (!fSurahs.some(s => surahs.includes(s))) return false;
+      }
+    }
+    return true;
+  });
+  renderGrid();
+}
+
+function renderGrid() {
+  const grid  = document.getElementById('grid');
+  const empty = document.getElementById('emptyState');
+
+  const total   = allImages.length;
+  const done    = allImages.filter(n=>(db[n]?.status||'none')==='done').length;
+  const partial = allImages.filter(n=>(db[n]?.status||'none')==='partial').length;
+  const improve = allImages.filter(n=>(db[n]?.status||'none')==='improve').length;
+  const none    = total - done - partial - improve;
+  document.getElementById('statsText').innerHTML =
+    `عرض <strong>${filtered.length}</strong> من ${total} صورة &nbsp;&nbsp;
+     <span class="stat-pill"><span class="dot" style="background:var(--s-done)"></span>${done} منجز</span>
+     <span class="stat-pill"><span class="dot" style="background:var(--s-partial)"></span>${partial} جزئي</span>
+     <span class="stat-pill"><span class="dot" style="background:var(--s-improve)"></span>${improve} يحتاج تحسين</span>
+     <span class="stat-pill"><span class="dot" style="background:var(--s-none)"></span>${none} لم يُبدأ</span>`;
+
+  if (!filtered.length) {
+    grid.classList.add('hidden'); empty.classList.remove('hidden'); return;
+  }
+  grid.classList.remove('hidden'); empty.classList.add('hidden');
+
+  if (thumbObs) thumbObs.disconnect();
+  thumbObs = new IntersectionObserver(entries => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      thumbObs.unobserve(e.target);
+      loadThumb(e.target.dataset.name, e.target);
+    }
+  }, { rootMargin: '200px' });
+
+  grid.innerHTML = '';
+  for (const name of filtered) {
+    const m      = db[name] || {};
+    const status = m.status || 'none';
+    const surahs = m.surahs || [];
+    const notes  = m.notes  || '';
+
+    const badge =
+      status === 'done'    ? `<div class="status-badge badge-done">منجز</div>` :
+      status === 'partial' ? `<div class="status-badge badge-partial">جزئي</div>` :
+      status === 'improve' ? `<div class="status-badge badge-improve">يحتاج تحسين</div>` : '';
+    const chips = surahs.length
+      ? surahs.map(n=>`<span class="surah-chip">${n}. ${SMAP.get(n)||''}<span class="chip-x" onclick="event.stopPropagation();removeSurahTag(${JSON.stringify(name)},${n})" title="حذف هذه السورة">×</span></span>`).join('')
+      : `<span style="color:#ccc;font-size:10px">لا سور محددة</span>`;
+
+    const noteHTML = notes ? `<div class="card-note" title="${h(notes)}">${h(notes)}</div>` : '';
+
+    const card = document.createElement('div');
+    card.className = `card${status!=='none' ? ' s-'+status : ''}`;
+    card.innerHTML = `
+      <div class="card-img-wrap" data-name="${h(name)}">
+        <div class="card-img-placeholder">🖼</div>
+      </div>
+      ${badge}
+      <div class="card-body">
+        <div class="card-name" title="${h(name)}">${h(name)}</div>
+        <div class="card-tags">${chips}</div>${noteHTML}
+      </div>`;
+    attachLongPress(card, name);
+    grid.appendChild(card);
+    thumbObs.observe(card.querySelector('.card-img-wrap'));
+  }
+}
+
+async function loadThumb(name, wrap) {
+  try {
+    let url = urlCache[name];
+    if (!url) {
+      const fh = await dirHandle.getFileHandle(name);
+      url = URL.createObjectURL(await fh.getFile());
+      urlCache[name] = url;
+    }
+    if (!document.body.contains(wrap)) return;
+    const img = document.createElement('img');
+    img.src = url; img.alt = name;
+    wrap.innerHTML = '';
+    wrap.appendChild(img);
+  } catch {
+    if (document.body.contains(wrap)) wrap.innerHTML = '<span style="font-size:11px;color:#aaa">خطأ</span>';
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  MULTI-SELECT DROPDOWN
+// ═══════════════════════════════════════════════
+// id = 'f' (filter) | 'm' (modal)
+const DS = {
+  f: { sel: () => fSurahs,  after: () => applyFilters() },
+  m: { sel: () => mSurahs,  after: () => {}            }
+};
+
+function toggleDrop(id) {
+  const dd = document.getElementById(id+'Drop');
+  const isOpen = !dd.classList.contains('hidden');
+  closeDrop('f'); closeDrop('m');
+  if (!isOpen) {
+    dd.classList.remove('hidden');
+    document.getElementById(id+'Btn').classList.add('open');
+    document.getElementById(id+'Search').value = '';
+    renderDrop(id);
+    document.getElementById(id+'Search').focus();
+  }
+}
+function closeDrop(id) {
+  document.getElementById(id+'Drop').classList.add('hidden');
+  document.getElementById(id+'Btn').classList.remove('open');
+}
+
+function renderDrop(id) {
+  const q   = document.getElementById(id+'Search').value.toLowerCase();
+  const sel = DS[id].sel();
+  const ul  = document.getElementById(id+'List');
+  ul.innerHTML = '';
+  for (const [num, name] of SURAHS) {
+    if (q && !normalizeAr(name).includes(normalizeAr(q)) && !String(num).includes(q)) continue;
+    const isSel = sel.includes(num);
+    const li = document.createElement('div');
+    li.className = 'ms-item' + (isSel ? ' selected' : '');
+    li.innerHTML = `<input type="checkbox" ${isSel?'checked':''}><span class="ms-num">${num}.</span>${name}`;
+    li.onclick = () => { toggleSurah(id, num); renderDrop(id); };
+    ul.appendChild(li);
+  }
+}
+
+function toggleSurah(id, num) {
+  const arr = DS[id].sel();
+  const i = arr.indexOf(num);
+  if (i>=0) arr.splice(i,1); else arr.push(num);
+  arr.sort((a,b)=>a-b);
+  updateTags(id);
+  DS[id].after();
+}
+
+function updateTags(id) {
+  const sel = DS[id].sel();
+  const tags = document.getElementById(id+'Tags');
+  const ph   = document.getElementById(id+'Ph');
+  if (!sel.length) {
+    tags.innerHTML = '';
+    ph.style.display = '';
+    ph.textContent = id==='f' ? 'جميع السور' : 'اختر السور…';
+  } else {
+    ph.style.display = 'none';
+    tags.innerHTML = sel.map(n =>
+      `<span class="tag">${n}. ${SMAP.get(n)}<span class="tag-x" onclick="event.stopPropagation();toggleSurah('${id}',${n})">×</span></span>`
+    ).join('');
+  }
+}
+
+function clearFilters() {
+  fSurahs.length = 0;
+  document.getElementById('fStatus').value        = 'all';
+  document.getElementById('fTagCount').value       = '';
+  document.getElementById('fExactSurahs').checked  = false;
+  updateTags('f');
+  applyFilters();
+}
+
+// Close dropdowns and context menu on outside click
+document.addEventListener('click', e => {
+  if (!document.getElementById('fWrap').contains(e.target)) closeDrop('f');
+  if (!document.getElementById('mWrap')?.contains(e.target)) closeDrop('m');
+  if (!e.target.closest('#ctxMenu')) hideCtxMenu();
+});
+
+// ═══════════════════════════════════════════════
+//  CONTEXT MENU
+// ═══════════════════════════════════════════════
+let ctxFile = null;
+
+function showCtxMenu(e, name) {
+  ctxFile = name;
+  const menu = document.getElementById('ctxMenu');
+  menu.classList.remove('hidden');
+  const mw = 170, mh = 48;
+  menu.style.left = Math.min(e.clientX, window.innerWidth  - mw - 6) + 'px';
+  menu.style.top  = Math.min(e.clientY, window.innerHeight - mh - 6) + 'px';
+}
+
+function hideCtxMenu() {
+  document.getElementById('ctxMenu').classList.add('hidden');
+  ctxFile = null;
+}
+
+async function ctxDelete() {
+  const name = ctxFile;
+  hideCtxMenu();
+  if (name) await deleteImageByName(name);
+}
+
+// ── remove a single surah tag from a card ──
+async function removeSurahTag(name, surahNum) {
+  const m = db[name] || {};
+  const surahs = (m.surahs || []).filter(s => s !== surahNum);
+  db[name] = { ...m, surahs };
+  await writeDB();
+  applyFilters();
+  showToast('تم حذف السورة');
+}
+
+// ═══════════════════════════════════════════════
+//  MODAL
+// ═══════════════════════════════════════════════
+async function openModal(name) {
+  mFile = name;
+  const m = db[name] || {};
+  mSurahs = [...(m.surahs||[])];
+  mStatus = m.status || 'none';
+
+  document.getElementById('modalTitle').textContent = name;
+  document.getElementById('modalNotes').value = m.notes || '';
+  updateTags('m');
+  updateStatusUI();
+
+  let url = urlCache[name];
+  if (!url) {
+    try {
+      const fh = await dirHandle.getFileHandle(name);
+      url = URL.createObjectURL(await fh.getFile());
+      urlCache[name] = url;
+    } catch { url = ''; }
+  }
+  document.getElementById('modalImg').src = url;
+  document.getElementById('modal').classList.remove('hidden');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.add('hidden');
+  closeDrop('m');
+  mFile = null;
+}
+
+async function saveImage() {
+  if (!mFile) return;
+  db[mFile] = {
+    surahs: [...mSurahs],
+    status: mStatus,
+    notes:  document.getElementById('modalNotes').value.trim()
+  };
+  await writeDB();
+  closeModal();
+  applyFilters();
+  showToast('تم الحفظ ✓');
+}
+
+async function deleteImageByName(name) {
+  if (!confirm(`هل تريد حذف هذه الصورة نهائياً؟\n${name}`)) return;
+  try {
+    await dirHandle.removeEntry(name);
+    if (urlCache[name]) URL.revokeObjectURL(urlCache[name]);
+    delete urlCache[name];
+    delete db[name];
+    await writeDB();
+    allImages = allImages.filter(n => n !== name);
+    if (mFile === name) closeModal();
+    applyFilters();
+    showToast('تم الحذف');
+  } catch(e) {
+    alert('تعذّر الحذف: ' + e.message);
+  }
+}
+
+async function deleteImage() {
+  if (mFile) await deleteImageByName(mFile);
+}
+
+function setStatus(s) { mStatus = s; updateStatusUI(); }
+function updateStatusUI() {
+  ['none','partial','done','improve'].forEach(s => {
+    document.getElementById('opt'+cap(s)).className =
+      'status-opt' + (mStatus===s ? ' sel-'+s : '');
+  });
+}
+
+function onOverlayClick(e) { if (e.target.id==='modal') closeModal(); }
+
+// ═══════════════════════════════════════════════
+//  IMAGE EDITOR
+// ═══════════════════════════════════════════════
+const eCanvas = () => document.getElementById('editorCanvas');
+const eBody   = () => document.getElementById('editorBody');
+
+async function openEditor() {
+  if (!mFile) return;
+  editorFile = mFile;
+  let url = urlCache[mFile];
+  if (!url) {
+    try {
+      const fh = await dirHandle.getFileHandle(mFile);
+      url = URL.createObjectURL(await fh.getFile());
+      urlCache[mFile] = url;
+    } catch { alert('تعذّر تحميل الصورة'); return; }
+  }
+  const img = new Image();
+  img.onload = () => {
+    const c = eCanvas();
+    editorCtx = c.getContext('2d');
+    c.width  = img.naturalWidth;
+    c.height = img.naturalHeight;
+    editorCtx.drawImage(img, 0, 0);
+    editorHistory = [];
+    saveEditorState();
+    setTool('pencil');
+    cancelCropSel();
+    document.getElementById('editorOverlay').classList.remove('hidden');
+    fitCanvas();
+  };
+  img.src = url;
+}
+
+function fitCanvas() {
+  const body = eBody();
+  const c    = eCanvas();
+  const maxW = body.clientWidth  - 32;
+  const maxH = body.clientHeight - 32;
+  const sc   = Math.min(maxW / c.width, maxH / c.height, 1);
+  c.style.width  = c.width  * sc + 'px';
+  c.style.height = c.height * sc + 'px';
+}
+
+function saveEditorState() {
+  const c = eCanvas();
+  const state = editorCtx.getImageData(0, 0, c.width, c.height);
+  editorHistory.push(state);
+  if (editorHistory.length > 25) editorHistory.shift();
+}
+
+function editorUndo() {
+  if (editorHistory.length <= 1) return;
+  editorHistory.pop();
+  const state = editorHistory[editorHistory.length-1];
+  const c = eCanvas();
+  c.width  = state.width;
+  c.height = state.height;
+  editorCtx.putImageData(state, 0, 0);
+  fitCanvas();
+  cancelCropSel();
+}
+
+function setTool(t) {
+  editorTool = t;
+  document.getElementById('btnPencil').classList.toggle('active', t==='pencil');
+  document.getElementById('btnCrop').classList.toggle('active', t==='crop');
+  eCanvas().style.cursor = 'crosshair';
+  if (t !== 'crop') cancelCropSel();
+}
+
+// Canvas coordinate helper
+function cPos(e) {
+  const r = eCanvas().getBoundingClientRect();
+  const src = e.touches ? e.touches[0] : e;
+  return [
+    (src.clientX - r.left) / r.width  * eCanvas().width,
+    (src.clientY - r.top)  / r.height * eCanvas().height
+  ];
+}
+
+// ─ Pencil ─
+eCanvas().addEventListener
+; // (bound in initEditorEvents)
+
+function onEditorDown(e) {
+  if (editorTool === 'pencil') {
+    const [x,y] = cPos(e);
+    isDrawing = true;
+    editorCtx.beginPath();
+    editorCtx.moveTo(x, y);
+  } else if (editorTool === 'crop') {
+    cropA = cPos(e); cropB = cropA;
+    cropDragging = true;
+    cancelCropSel();
+  }
+}
+function onEditorMove(e) {
+  e.preventDefault();
+  if (editorTool === 'pencil' && isDrawing) {
+    const [x,y] = cPos(e);
+    const sc = eCanvas().width / eCanvas().getBoundingClientRect().width;
+    editorCtx.lineWidth   = parseInt(document.getElementById('penSize').value) * sc;
+    editorCtx.strokeStyle = document.getElementById('penColor').value;
+    editorCtx.lineJoin = 'round'; editorCtx.lineCap = 'round';
+    editorCtx.lineTo(x, y); editorCtx.stroke();
+    editorCtx.beginPath(); editorCtx.moveTo(x, y);
+  } else if (editorTool === 'crop' && cropDragging) {
+    cropB = cPos(e);
+    drawCropBox();
+  }
+}
+function onEditorUp(e) {
+  if (editorTool === 'pencil' && isDrawing) {
+    isDrawing = false;
+    saveEditorState();
+  } else if (editorTool === 'crop' && cropDragging) {
+    cropDragging = false;
+    cropB = cPos(e);
+    drawCropBox();
+    const w = Math.abs(cropB[0]-cropA[0]);
+    const h = Math.abs(cropB[1]-cropA[1]);
+    if (w > 5 && h > 5) document.getElementById('applyCropBtn').classList.remove('hidden');
+  }
+}
+
+function drawCropBox() {
+  if (!cropA || !cropB) return;
+  const c    = eCanvas();
+  const cr   = c.getBoundingClientRect();
+  const br   = eBody().getBoundingClientRect();
+  const scX  = cr.width  / c.width;
+  const scY  = cr.height / c.height;
+
+  const x1 = Math.min(cropA[0], cropB[0]) * scX + (cr.left - br.left);
+  const y1 = Math.min(cropA[1], cropB[1]) * scY + (cr.top  - br.top);
+  const w  = Math.abs(cropB[0]-cropA[0]) * scX;
+  const hh = Math.abs(cropB[1]-cropA[1]) * scY;
+
+  const box = document.getElementById('cropBox');
+  box.style.cssText = `display:block;left:${x1}px;top:${y1}px;width:${w}px;height:${hh}px;`;
+}
+
+function cancelCropSel() {
+  cropA = cropB = null; cropDragging = false;
+  document.getElementById('cropBox').style.display = 'none';
+  document.getElementById('applyCropBtn').classList.add('hidden');
+}
+
+function applyCrop() {
+  if (!cropA || !cropB) return;
+  const x = Math.round(Math.min(cropA[0], cropB[0]));
+  const y = Math.round(Math.min(cropA[1], cropB[1]));
+  const w = Math.round(Math.abs(cropB[0]-cropA[0]));
+  const hh= Math.round(Math.abs(cropB[1]-cropA[1]));
+  if (w < 5 || hh < 5) { cancelCropSel(); return; }
+  const data = editorCtx.getImageData(x, y, w, hh);
+  const c = eCanvas();
+  c.width = w; c.height = hh;
+  editorCtx.putImageData(data, 0, 0);
+  fitCanvas();
+  saveEditorState();
+  cancelCropSel();
+}
+
+async function saveEditorFile() {
+  const mime = editorFile?.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+  eCanvas().toBlob(async blob => {
+    try {
+      const fh = await dirHandle.getFileHandle(editorFile, { create: false });
+      const w  = await fh.createWritable();
+      await w.write(blob); await w.close();
+      // Refresh cache
+      if (urlCache[editorFile]) URL.revokeObjectURL(urlCache[editorFile]);
+      const newFile = await fh.getFile();
+      urlCache[editorFile] = URL.createObjectURL(newFile);
+      if (mFile === editorFile) document.getElementById('modalImg').src = urlCache[editorFile];
+      closeEditor();
+      applyFilters();
+      showToast('تم حفظ الصورة ✓');
+    } catch(err) { alert('خطأ في الحفظ: ' + err.message); }
+  }, mime, 0.95);
+}
+
+function closeEditor() {
+  document.getElementById('editorOverlay').classList.add('hidden');
+  isDrawing = false; cancelCropSel();
+  if (!document.getElementById('viewOverlay').classList.contains('hidden')) {
+    const name = vmCurrentName;
+    if (name) { document.getElementById('viewImg').src = ''; loadViewImg(name); }
+  }
+}
+
+function initEditorEvents() {
+  const c = document.getElementById('editorCanvas');
+  c.addEventListener('mousedown',  onEditorDown);
+  c.addEventListener('mousemove',  onEditorMove, { passive: false });
+  c.addEventListener('mouseup',    onEditorUp);
+  c.addEventListener('mouseleave', () => { if (isDrawing) { isDrawing = false; saveEditorState(); } });
+  c.addEventListener('touchstart', e => { e.preventDefault(); onEditorDown(e); }, { passive: false });
+  c.addEventListener('touchmove',  e => { e.preventDefault(); onEditorMove(e); }, { passive: false });
+  c.addEventListener('touchend',   e => { e.preventDefault(); onEditorUp(e); },   { passive: false });
+  window.addEventListener('resize', () => { if (!document.getElementById('editorOverlay').classList.contains('hidden')) fitCanvas(); });
+}
+
+// ═══════════════════════════════════════════════
+//  DELETE MODE
+
+// ═══════════════════════════════════════════════
+//  LONG PRESS + QUICK ASSIGN
+// ═══════════════════════════════════════════════
+let qaFile = null, qaSurahs = [], didLongPress = false, lpTimer = null;
+
+function attachLongPress(card, name) {
+  let sx, sy;
+  const start = e => {
+    const src = e.touches ? e.touches[0] : e;
+    sx = src.clientX; sy = src.clientY;
+    lpTimer = setTimeout(() => {
+      didLongPress = true;
+      card.classList.add('lp-active');
+      openQA(name);
+    }, 500);
+  };
+  const move = e => {
+    const src = e.touches ? e.touches[0] : e;
+    if (Math.abs(src.clientX-sx)>8 || Math.abs(src.clientY-sy)>8) clearTimeout(lpTimer);
+  };
+  const end = () => { clearTimeout(lpTimer); card.classList.remove('lp-active'); };
+
+  card.addEventListener('mousedown',   start);
+  card.addEventListener('mousemove',   move);
+  card.addEventListener('mouseup',     end);
+  card.addEventListener('mouseleave',  end);
+  card.addEventListener('touchstart',  start, { passive:true });
+  card.addEventListener('touchmove',   move,  { passive:true });
+  card.addEventListener('touchend',    end);
+  card.addEventListener('contextmenu', e => { e.preventDefault(); showCtxMenu(e, name); });
+  card.addEventListener('click', (e) => {
+    if (didLongPress) { didLongPress = false; return; }
+    openViewMode(name);
+  });
+}
+
+function openQA(name) {
+  qaFile   = name;
+  qaSurahs = [...((db[name]||{}).surahs||[])];
+  document.getElementById('qaFilename').textContent = name;
+  document.getElementById('qaSearch').value = '';
+  renderQAList();
+  updateQACount();
+  document.getElementById('qaOverlay').classList.remove('hidden');
+  setTimeout(() => document.getElementById('qaSearch').focus(), 50);
+}
+
+function closeQA() {
+  document.getElementById('qaOverlay').classList.add('hidden');
+  qaFile = null;
+}
+
+function onQAOverlay(e) { if (e.target.id==='qaOverlay') closeQA(); }
+
+function renderQAList() {
+  const q    = document.getElementById('qaSearch').value.toLowerCase();
+  const grid = document.getElementById('qaList');
+  grid.innerHTML = '';
+  for (const [num, name] of SURAHS) {
+    if (q && !normalizeAr(name).includes(normalizeAr(q)) && !String(num).includes(q)) continue;
+    const isSel = qaSurahs.includes(num);
+    const tile  = document.createElement('div');
+    tile.className = 'sg-tile' + (isSel ? ' sel' : '');
+    tile.innerHTML = `<span class="sg-num">${num}</span><span class="sg-name">${name}</span>`;
+    tile.onclick = () => {
+      const i = qaSurahs.indexOf(num);
+      if (i>=0) qaSurahs.splice(i,1); else qaSurahs.push(num);
+      qaSurahs.sort((a,b)=>a-b);
+      tile.classList.toggle('sel', qaSurahs.includes(num));
+      updateQACount();
+    };
+    grid.appendChild(tile);
+  }
+}
+
+function updateQACount() {
+  document.getElementById('qaCount').textContent =
+    qaSurahs.length ? `${qaSurahs.length} سورة محددة` : '';
+}
+
+async function saveQA() {
+  if (!qaFile) return;
+  db[qaFile] = { ...(db[qaFile]||{}), surahs:[...qaSurahs] };
+  await writeDB();
+  closeQA();
+  applyFilters();
+  showToast('تم الحفظ ✓');
+}
+
+// ═══════════════════════════════════════════════
+//  KEYBOARD
+// ═══════════════════════════════════════════════
+document.addEventListener('keydown', e => {
+  const inView = !document.getElementById('viewOverlay').classList.contains('hidden');
+  if (inView && document.getElementById('editorOverlay').classList.contains('hidden')) {
+    if (e.key === 'Escape') { closeViewMode(); return; }
+    if (!['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) {
+      if (e.key === 'ArrowLeft')  { viewNav(1);  return; }
+      if (e.key === 'ArrowRight') { viewNav(-1); return; }
+    }
+    if (e.key === 't' && !e.ctrlKey && !e.metaKey && !e.altKey && !['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) {
+      e.preventDefault(); document.getElementById('viewTagInput').focus(); return;
+    }
+  }
+  if (e.key === 'Escape') {
+    if (!document.getElementById('editorOverlay').classList.contains('hidden')) { closeEditor(); return; }
+    if (!document.getElementById('qaOverlay').classList.contains('hidden'))     { closeQA(); return; }
+    if (!document.getElementById('statsOverlay').classList.contains('hidden'))  { closeStats(); return; }
+    hideCtxMenu();
+    closeModal();
+    closeDrop('f'); closeDrop('m');
+  }
+  if (e.key === 'Enter' && mFile && document.activeElement.tagName !== 'TEXTAREA') saveImage();
+  if ((e.ctrlKey||e.metaKey) && e.key==='z' && !document.getElementById('editorOverlay').classList.contains('hidden')) {
+    e.preventDefault(); editorUndo();
+  }
+});
+
+// ═══════════════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════════════
+function h(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function cap(s) { return s.charAt(0).toUpperCase()+s.slice(1); }
+function normalizeAr(s) { return s.replace(/[أإآٱ]/g, 'ا'); }
+
+let toastT;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// ═══════════════════════════════════════════════
+//  STATS
+// ═══════════════════════════════════════════════
+function openStats() {
+  renderStats();
+  document.getElementById('statsOverlay').classList.remove('hidden');
+}
+function closeStats() { document.getElementById('statsOverlay').classList.add('hidden'); }
+function onStatsOverlayClick(e) { if (e.target.id === 'statsOverlay') closeStats(); }
+
+function renderStats() {
+  const total   = allImages.length;
+  const done    = allImages.filter(n => (db[n]?.status||'none') === 'done').length;
+  const partial = allImages.filter(n => (db[n]?.status||'none') === 'partial').length;
+  const improve = allImages.filter(n => (db[n]?.status||'none') === 'improve').length;
+  const none    = total - done - partial - improve;
+
+  const surahCounts = new Map();
+  const surahDone   = new Map();
+  for (const name of allImages) {
+    const isDone = (db[name]?.status || 'none') === 'done';
+    for (const s of (db[name]?.surahs || [])) {
+      surahCounts.set(s, (surahCounts.get(s) || 0) + 1);
+      if (isDone) surahDone.set(s, (surahDone.get(s) || 0) + 1);
+    }
+  }
+  const surahEntries = [...surahCounts.entries()].sort((a, b) => b[1] - a[1]);
+  const pct = n => total ? Math.round(n / total * 100) : 0;
+
+  document.getElementById('statsBody').innerHTML = `
+    <div>
+      <div class="stats-section-title">ملخص</div>
+      <div class="stats-bar-wrap">
+        <div class="stats-bar-seg" style="width:${pct(done)}%;background:var(--s-done)"></div>
+        <div class="stats-bar-seg" style="width:${pct(partial)}%;background:var(--s-partial)"></div>
+        <div class="stats-bar-seg" style="width:${pct(improve)}%;background:var(--s-improve)"></div>
+        <div class="stats-bar-seg" style="width:${pct(none)}%;background:var(--s-none)"></div>
+      </div>
+      <div class="stats-status-row">
+        <div class="stats-card sc-total">
+          <div class="stats-card-num" style="color:var(--primary)">${total}</div>
+          <div class="stats-card-label">إجمالي الصور</div>
+        </div>
+        <div class="stats-card sc-done">
+          <div class="stats-card-num" style="color:var(--s-done)">${done}</div>
+          <div class="stats-card-label">منجز</div>
+          <div class="stats-card-pct">${pct(done)}%</div>
+        </div>
+        <div class="stats-card sc-partial">
+          <div class="stats-card-num" style="color:var(--s-partial)">${partial}</div>
+          <div class="stats-card-label">منجز جزئياً</div>
+          <div class="stats-card-pct">${pct(partial)}%</div>
+        </div>
+        <div class="stats-card sc-improve">
+          <div class="stats-card-num" style="color:var(--s-improve)">${improve}</div>
+          <div class="stats-card-label">يحتاج تحسين</div>
+          <div class="stats-card-pct">${pct(improve)}%</div>
+        </div>
+        <div class="stats-card sc-none">
+          <div class="stats-card-num" style="color:var(--s-none)">${none}</div>
+          <div class="stats-card-label">لم يُبدأ</div>
+          <div class="stats-card-pct">${pct(none)}%</div>
+        </div>
+      </div>
+    </div>
+    ${surahEntries.length ? `
+    <div>
+      <div class="stats-section-title">توزيع السور — ${surahEntries.length} سورة موسومة</div>
+      <div class="stats-surah-grid">
+        ${surahEntries.map(([num, count]) => {
+          const doneCount = surahDone.get(num) || 0;
+          const todoCount = count - doneCount;
+          const donePct   = Math.round(doneCount / count * 100);
+          const todoPct   = 100 - donePct;
+          const doneBar   = donePct > 0
+            ? `<div class="surah-bar-done" style="width:${donePct}%">${donePct >= 28 ? donePct + '%' : ''}</div>` : '';
+          const todoBar   = todoPct > 0
+            ? `<div class="surah-bar-todo" style="width:${todoPct}%">${todoPct >= 28 ? todoPct + '%' : ''}</div>` : '';
+          return `
+          <div class="stats-surah-card" title="عرض صور سورة ${SMAP.get(num)||''} — ${doneCount} منجز / ${todoCount} متبقي" onclick="filterBySurahFromStats(${num})">
+            <div class="stats-surah-name">${SMAP.get(num)||''}</div>
+            <div class="stats-surah-num">${count} صورة</div>
+            <div class="surah-prog-bar">${doneBar}${todoBar}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>` : `<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px 0">لا توجد سور محددة بعد</div>`}
+  `;
+}
+
+function filterBySurahFromStats(num) {
+  fSurahs.length = 0; fSurahs.push(num);
+  updateTags('f');
+  applyFilters();
+  closeStats();
+}
+
+// ═══════════════════════════════════════════════
+//  VIEW MODE
+// ═══════════════════════════════════════════════
+let vmIndex       = 0;
+let vmCurrentName = null;  // filename actually on screen — all writes use this, never raw vmIndex
+let vmSurahs      = [];
+let vmStatus      = 'none';
+let vmTouchX      = 0;
+let vmTouchY      = 0;
+
+function startReview() {
+  reviewMode = true;
+  // Jump to first unreviewed in filtered (or start of filtered)
+  const firstIdx = filtered.findIndex(n => !reviewedSet.has(n));
+  const name = filtered[firstIdx >= 0 ? firstIdx : 0];
+  if (!name) { showToast('لا توجد صور للمراجعة'); reviewMode = false; return; }
+  openViewMode(name);
+}
+
+function updateReviewBar() {
+  const total    = allImages.length;
+  const reviewed = allImages.filter(n => reviewedSet.has(n)).length;
+  const pct      = total ? Math.round(reviewed / total * 100) : 0;
+  document.getElementById('reviewProgressFill').style.width = pct + '%';
+  document.getElementById('reviewProgressText').textContent = `${reviewed} / ${total} — ${pct}%`;
+}
+
+
+function openViewMode(name) {
+  const idx = filtered.indexOf(name);
+  if (idx < 0) return;
+  vmIndex = idx;
+  renderViewMode();
+  document.getElementById('reviewBar').classList.toggle('hidden', !reviewMode);
+  if (reviewMode) updateReviewBar();
+  document.getElementById('viewOverlay').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeViewMode() {
+  reviewMode = false;
+  vmCurrentName = null;
+  document.getElementById('reviewBar').classList.add('hidden');
+  document.getElementById('viewOverlay').classList.add('hidden');
+  document.body.style.overflow = '';
+  applyFilters();
+}
+
+function renderViewMode() {
+  const name = filtered[vmIndex];
+  if (!name) return;
+  vmCurrentName = name;
+  const m = db[name] || {};
+  vmSurahs = [...(m.surahs || [])];
+  vmStatus = m.status || 'none';
+
+  document.getElementById('viewFilename').textContent = name;
+  document.getElementById('viewCounter').textContent  = `${vmIndex + 1} / ${filtered.length}`;
+  document.getElementById('viewPrevBtn').disabled = vmIndex === 0;
+  document.getElementById('viewNextBtn').disabled = vmIndex === filtered.length - 1;
+
+  document.getElementById('viewImg').src = '';
+  loadViewImg(name);
+  if (reviewMode) { reviewedSet.add(name); updateReviewBar(); }
+
+  const tagInp = document.getElementById('viewTagInput');
+  if (tagInp) tagInp.value = '';
+  renderViewTagBar();
+
+  const noteEl = document.getElementById('viewNoteInput');
+  noteEl.value = m.notes || '';
+  autoResizeNote(noteEl);
+  renderViewStatusBtns();
+}
+
+
+async function loadViewImg(name) {
+  let url = urlCache[name];
+  if (!url) {
+    try {
+      const fh = await dirHandle.getFileHandle(name);
+      url = URL.createObjectURL(await fh.getFile());
+      urlCache[name] = url;
+    } catch { return; }
+  }
+  if (document.getElementById('viewFilename').textContent === name) {
+    document.getElementById('viewImg').src = url;
+  }
+}
+
+function viewNav(dir) {
+  const next = vmIndex + dir;
+  if (next < 0 || next >= filtered.length) return;
+  vmIndex = next;
+  renderViewMode();
+}
+
+function renderViewStatusBtns() {
+  ['none','partial','done','improve'].forEach(s => {
+    const btn = document.getElementById('vsb-' + s);
+    if (btn) btn.className = 'vsb' + (vmStatus === s ? ' vsb-active-' + s : '');
+  });
+}
+
+async function setViewStatus(s) {
+  const name = vmCurrentName; if (!name) return;
+  vmStatus = s;
+  db[name] = { ...(db[name] || {}), status: s };
+  await writeStatesDB();
+  renderViewStatusBtns();
+}
+
+async function saveViewNote() {
+  const name = vmCurrentName; if (!name) return;
+  const note = document.getElementById('viewNoteInput').value.trim();
+  if ((db[name]?.notes || '') === note) return;
+  db[name] = { ...(db[name] || {}), notes: note };
+  await writeStatesDB();
+}
+
+function autoResizeNote(el) {
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
+
+// ─ Suggestion list keyboard navigation ─
+function sugMoveHi(dropId, dir) {
+  const drop = document.getElementById(dropId);
+  if (!drop || drop.classList.contains('hidden')) return;
+  const items = [...drop.querySelectorAll('.vp-sug-item:not(.vp-sug-sel)')];
+  if (!items.length) return;
+  const cur = drop.querySelector('.vp-sug-hi');
+  let idx = cur ? items.indexOf(cur) : (dir === 1 ? -1 : items.length);
+  if (cur) cur.classList.remove('vp-sug-hi');
+  idx += dir;
+  if (idx < 0) idx = items.length - 1;
+  if (idx >= items.length) idx = 0;
+  items[idx].classList.add('vp-sug-hi');
+  items[idx].scrollIntoView({ block: 'nearest' });
+}
+
+// ─ Always-visible tag bar ─
+function renderViewTagBar() {
+  const q = (document.getElementById('viewTagInput')?.value || '').trim().toLowerCase();
+
+  document.getElementById('viewTagChips').innerHTML = vmSurahs.map(n =>
+    `<span class="vp-surah-chip-dark">${n}. ${SMAP.get(n)}<span class="vp-chip-x" onclick="event.stopPropagation();viewRemoveSurah(${n})">×</span></span>`
+  ).join('');
+
+  const drop = document.getElementById('viewSugDrop');
+  if (!q) { drop.classList.add('hidden'); drop.innerHTML = ''; return; }
+
+  const nq = normalizeAr(q);
+  const matches = SURAHS.filter(([num, name]) => normalizeAr(name).includes(nq) || String(num).startsWith(q));
+  if (!matches.length) { drop.classList.add('hidden'); drop.innerHTML = ''; return; }
+
+  let hiSet = false;
+  drop.innerHTML = matches.map(([num, name]) => {
+    const isSel = vmSurahs.includes(num);
+    const isHi  = !isSel && !hiSet ? (hiSet = true, true) : false;
+    return `<div class="vp-sug-item${isSel ? ' vp-sug-sel' : isHi ? ' vp-sug-hi' : ''}" data-num="${num}" onclick="${isSel ? '' : `viewAddSurah(${num})`}">
+      <span class="vp-sug-num">${num}</span>${name}${isSel ? '<span class="vp-sug-check">✓</span>' : ''}
+    </div>`;
+  }).join('');
+  drop.classList.remove('hidden');
+}
+
+async function viewAddSurah(num) {
+  if (!vmSurahs.includes(num)) { vmSurahs.push(num); vmSurahs.sort((a, b) => a - b); }
+  const name = vmCurrentName;
+  if (name) {
+    db[name] = { ...(db[name] || {}), surahs: [...vmSurahs] };
+    await writeTagsDB();
+  }
+  document.getElementById('viewTagInput').value = '';
+  renderViewTagBar();
+  document.getElementById('viewTagInput').focus();
+}
+
+async function viewRemoveSurah(num) {
+  vmSurahs = vmSurahs.filter(n => n !== num);
+  const name = vmCurrentName;
+  if (name) {
+    db[name] = { ...(db[name] || {}), surahs: [...vmSurahs] };
+    await writeTagsDB();
+  }
+  renderViewTagBar();
+  document.getElementById('viewTagInput').focus();
+}
+
+function initViewTagInput() {
+  const inp = document.getElementById('viewTagInput');
+  inp.addEventListener('input', renderViewTagBar);
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); sugMoveHi('viewSugDrop', 1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); sugMoveHi('viewSugDrop', -1); }
+    else if (e.key === 'Enter') {
+      e.preventDefault();
+      const hi = document.querySelector('#viewSugDrop .vp-sug-hi');
+      if (hi) viewAddSurah(parseInt(hi.dataset.num));
+    } else if (e.key === 'Backspace' && !inp.value && vmSurahs.length) {
+      viewRemoveSurah(vmSurahs[vmSurahs.length - 1]);
+    } else if (e.key === 'Escape') {
+      inp.value = ''; renderViewTagBar();
+    }
+  });
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#viewTagArea')) {
+      const drop = document.getElementById('viewSugDrop');
+      if (drop) { drop.classList.add('hidden'); drop.innerHTML = ''; }
+    }
+  });
+}
+
+function clampVmIndex() {
+  if (!filtered.length) { closeViewMode(); return; }
+  vmIndex = Math.min(vmIndex, filtered.length - 1);
+}
+
+// ─ Delete / editor from view ─
+async function deleteFromView() {
+  const name = vmCurrentName; if (!name) return;
+  if (!confirm(`هل تريد حذف هذه الصورة نهائياً؟\n${name}`)) return;
+  try {
+    await dirHandle.removeEntry(name);
+    if (urlCache[name]) URL.revokeObjectURL(urlCache[name]);
+    delete urlCache[name]; delete db[name];
+    await writeDB();
+    allImages = allImages.filter(n => n !== name);
+    applyFilters();
+    if (!filtered.length) { closeViewMode(); return; }
+    vmIndex = Math.min(vmIndex, filtered.length - 1);
+    renderViewMode(); showToast('تم الحذف');
+  } catch(e) { alert('تعذّر الحذف: ' + e.message); }
+}
+function openEditorFromView() {
+  const name = vmCurrentName; if (!name) return;
+  mFile = name; openEditor();
+}
+
+// ─ Touch swipe ─
+function initViewTouchEvents() {
+  const area = document.getElementById('viewImgArea');
+  area.addEventListener('touchstart', e => {
+    vmTouchX = e.touches[0].clientX; vmTouchY = e.touches[0].clientY;
+  }, { passive: true });
+  area.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - vmTouchX;
+    const dy = e.changedTouches[0].clientY - vmTouchY;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) viewNav(dx > 0 ? -1 : 1);
+  }, { passive: true });
+}
+
+// ═══════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════
+async function init() {
+  if (!window.showDirectoryPicker) {
+    document.querySelector('.welcome-card p').textContent =
+      'هذا التطبيق يعمل في Chrome أو Edge فقط. يرجى فتح الملف في أحد هذين المتصفحَين.';
+    const btn = document.querySelector('.welcome-card .btn-primary');
+    btn.disabled = true;
+    btn.textContent = 'المتصفح غير مدعوم';
+    return;
+  }
+  initEditorEvents();
+  initViewTouchEvents();
+  initViewTagInput();
+  try {
+    const saved = await idbGet('dir');
+    if (saved && (await saved.requestPermission({ mode:'readwrite' })) === 'granted') {
+      dirHandle = saved; await loadApp(); return;
+    }
+  } catch {}
+}
+
+init();
+</script>
+</body>
+</html>
