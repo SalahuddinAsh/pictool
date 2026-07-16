@@ -1,82 +1,125 @@
 ════════════════════════════════════════════════════════════
-  PICTOOL — Quran Screenshot Organizer
-  Instructions for both users
+  PICTOOL v3 — Quran Screenshot Organizer
+  Instructions for all users
 ════════════════════════════════════════════════════════════
 
-SETUP (do this once)
-────────────────────
-1. Put the "pictool" folder in your shared Google Drive.
-   Both people must install Google Drive desktop app so the
-   folder syncs automatically on both computers.
+WHAT CHANGED IN v3 (READ THIS FIRST)
+────────────────────────────────────
+v2 kept everyone's data in shared files inside a Google Drive
+folder. That design could silently destroy work: if someone's
+Drive had been offline and then came back, their stale files
+could overwrite everyone else's newer data. This actually
+happened.
 
-2. Put all your screenshot images directly inside the
-   "pictool" folder (or any subfolder — just make sure you
-   select the right folder in the app).
+v3 removes that risk by design:
 
-3. Open "index.html" in Chrome or Microsoft Edge.
-   (Double-click the file — it opens in your browser.)
+  • DO NOT sync the images folder with Google Drive anymore.
+    Each person keeps their OWN local copy of the folder.
 
-4. Click "Open Images Folder" and select the "pictool"
-   folder from Google Drive.
-   The app will remember this folder next time you open it.
+  • Each person has exactly ONE data file that only their own
+    machine ever writes:
+        A → a_data.json
+        Z → z_data.json
+        S → s_data.json
+
+  • Nothing writes to your file in the background. Ever.
+    Only you, on your machine, through the app.
+
+  • You see other people's data only when YOU choose to import
+    their file. Nothing arrives behind your back.
+
+The worst case is now "I'm looking at slightly old data from
+the other person" — never "my work is gone."
+
+
+SETUP (once per machine)
+────────────────────────
+1. Open the app: https://<your-github-user>.github.io/pictool/
+   (Chrome or Microsoft Edge only.)
+
+2. Choose who you are (A, Z, or S). This is stored on your
+   machine and decides the single file the app writes to.
+   Choose carefully — changing it later is deliberately
+   protected, because writing another person's file is exactly
+   the mistake v3 exists to prevent.
+
+3. Click "فتح مجلد الصور" and select your local images folder.
+   The app remembers it next time.
+
+4. On first run, the app builds your personal data file from
+   the old v2 files (tags.json / *_states.json) automatically.
+   It never modifies those old files.
 
 
 DAILY USE
 ─────────
-• Open index.html in Chrome or Edge.
-• The app loads your images automatically.
-• Click any image to tag it.
+• Open the app link, work normally: tag surahs, set status,
+  write notes and units. Every change saves to YOUR file only.
+
+• "عرض بيانات": toggle whether you want to see A's / Z's / S's
+  data alongside yours. This only affects the display — it can
+  never change what gets written.
+
+• Next to those buttons the app shows how fresh each person's
+  imported data is ("بيانات Z: 16/7 21:38"). It turns orange
+  after 3 days and red after 7, so stale data is never silent.
 
 
-TAGGING AN IMAGE (click on it)
-───────────────────────────────
-• Surahs: click the surah box and search by name or number.
-  You can add multiple surahs to one image.
-  Click × on a tag to remove it.
+SHARING YOUR WORK WITH THE OTHERS
+─────────────────────────────────
+1. You: click "📤 تصدير". This downloads your data file.
+   Send it however you like (email, WhatsApp, Telegram…).
 
-• Status:
-  - Not started  = no one has worked on it yet
-  - Partially done = one person finished their part,
-                     the other person still needs to work on it
-  - Done = both people have finished with this image
+2. Them: click "📥 استيراد" and pick the file they received.
 
-• Notes: write anything helpful, e.g.:
-  "Person 1 done (Al-Baqara). Person 2 still needs to check."
+The app reads the owner's identity from INSIDE the file, not
+from its name — so a renamed file still lands in the right
+place, and importing someone's file can only ever update THAT
+person's data. An import can never touch your own work.
 
-• Click SAVE when done.
+If you import a file older than what you already have from
+that person, the app warns you first.
 
 
-FILTERING
-─────────
-• Click "Surah:" dropdown to show only images that contain
-  a specific surah (or multiple surahs).
-• Use "Status:" to show only Partially done images, etc.
-• Click "Clear filters" to go back to all images.
-
-
-ADDING NEW IMAGES
-─────────────────
-Drop new screenshots into the pictool folder in Google Drive.
-Then click "↻ Refresh" in the app to see them.
-
-
-SYNCING BETWEEN TWO PEOPLE
+BACKUPS AND VERSION HISTORY
 ───────────────────────────
-The app saves all tags in a file called "data.json" in the
-pictool folder. Google Drive syncs this file automatically.
+• Every time you open your folder, the app saves a timestamped
+  snapshot of your data file into the "backups" subfolder,
+  before anything is written that session.
 
-Wait a few seconds after saving before the other person
-opens the app (to let Google Drive sync). Click "↻ Refresh"
-to load the latest tags saved by the other person.
+• Every file you import is archived there too.
 
-TIP: Avoid both people editing the same image at exactly
-the same time — this could cause one person's save to
-overwrite the other's. Work on different images at once.
+• Click "🕘 النسخ الاحتياطية" to see every version with a
+  summary (owner, save date, how many surahs / statuses /
+  notes it holds) and restore any of them.
+
+• Restoring first backs up your current state, then swaps.
+  So restoring can never lose anything either — including
+  restoring by mistake.
+
+The backups folder is small (kilobytes per version). Leave it
+alone; don't delete it.
+
+
+IMPORTANT RULES
+───────────────
+• Do NOT put the images folder back into Google Drive or any
+  other sync tool. That reintroduces the exact problem v3
+  solves.
+
+• Do NOT copy someone else's *_data.json into your folder by
+  hand. Use "📥 استيراد" so the app can validate, archive,
+  and warn about it.
+
+• Deleting images is disabled: everyone's folder copy must
+  stay aligned by hand, so silent deletions are not allowed.
+
+• User S is read-only and cannot write any data.
 
 
 BROWSER REQUIREMENT
 ───────────────────
 Chrome or Microsoft Edge only.
-Does NOT work in Firefox or Internet Explorer.
+Does NOT work in Firefox or Safari.
 
 ════════════════════════════════════════════════════════════

@@ -799,23 +799,28 @@ input[type=range].pen-size {
 
 <!-- ── HEADER ── -->
 <div id="appHeader" class="header hidden">
-  <span class="logo">📖 بيكتول <span style="font-size:14px;font-weight:400;opacity:.5;letter-spacing:.02em">v2.8</span></span>
-  <span style="font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap">المستخدم الحالي:</span>
-  <div class="user-sel" id="userSel">
-    <button class="user-btn" id="uBtn-a" onclick="switchUser('a')">A</button>
-    <button class="user-btn" id="uBtn-b" onclick="switchUser('b')">Z</button>
-    <button class="user-btn" id="uBtn-c" onclick="switchUser('c')">S</button>
+  <span class="logo">📖 بيكتول <span style="font-size:14px;font-weight:400;opacity:.5;letter-spacing:.02em">v3.0</span></span>
+  <span style="font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap">أنا:</span>
+  <div class="user-sel">
+    <button class="user-btn active" id="identityBadge" onclick="changeIdentity()" title="هويتك على هذا الجهاز — التغيير محمي"></button>
   </div>
+  <span style="font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap">عرض بيانات:</span>
+  <div class="user-sel" id="viewUserBtns"></div>
+  <span id="syncInfo" style="font-size:11px;color:var(--muted);white-space:nowrap"></span>
   <span class="user-sep"></span>
   <div class="header-actions">
     <button class="btn btn-ghost" onclick="openStats()">📊 إحصائيات</button>
     <button class="btn btn-ghost" onclick="openDetailedStats()">📈 إحصائيات تفصيلية</button>
-    <button class="btn btn-ghost" onclick="openManageTags()">🏷 إدارة الوسوم</button>
+    <button class="btn btn-ghost" id="manageTagsBtn" onclick="openManageTags()">🏷 إدارة الوسوم</button>
     <button class="btn btn-ghost" id="reviewBtn" onclick="startReview()">🔍 مراجعة</button>
     <button class="btn btn-ghost" onclick="refreshImages()">↻ تحديث</button>
+    <button class="btn btn-ghost" id="exportBtn" onclick="exportMyData()">📤 تصدير</button>
+    <button class="btn btn-ghost" onclick="triggerImport()">📥 استيراد</button>
+    <button class="btn btn-ghost" onclick="openVersions()">🕘 النسخ الاحتياطية</button>
     <button class="btn btn-ghost" onclick="openFolder()">تغيير المجلد</button>
   </div>
 </div>
+<input type="file" id="importFileInput" accept="application/json,.json" style="display:none" onchange="onImportFile(event)">
 
 <!-- ── FILTER BAR ── -->
 <div id="filterBar" class="filterbar hidden">
@@ -1062,6 +1067,27 @@ input[type=range].pen-size {
   </div>
 </div>
 
+<!-- ── IDENTITY PICKER ── -->
+<div class="overlay hidden" id="identityOverlay">
+  <div class="stats-modal" style="width:min(480px,96vw)">
+    <div class="stats-header">
+      <span class="stats-title">👤 من أنت على هذا الجهاز؟</span>
+    </div>
+    <div class="stats-body" id="identityBody"></div>
+  </div>
+</div>
+
+<!-- ── VERSIONS / BACKUPS OVERLAY ── -->
+<div class="overlay hidden" id="versionsOverlay" onclick="onVersionsOverlayClick(event)">
+  <div class="stats-modal" style="width:min(760px,96vw)">
+    <div class="stats-header">
+      <span class="stats-title">🕘 النسخ الاحتياطية</span>
+      <button class="btn btn-ghost" onclick="closeVersions()">✕ إغلاق</button>
+    </div>
+    <div class="stats-body" id="versionsBody"></div>
+  </div>
+</div>
+
 <!-- ── VIEW MODE ── -->
 <div id="viewOverlay" class="view-overlay hidden">
   <div class="view-header">
@@ -1176,7 +1202,13 @@ function allStatusTags() { return [...BUILTIN_STATUSES, ...customStatusTags]; }
 function isBuiltinStatus(id) { return id === 'none' || BUILTIN_STATUSES.some(t => t.id === id); }
 function statusMeta(id) {
   if (!id || id === 'none') return { id: 'none', label: 'لم يُبدأ', color: '#9ca3af' };
-  return allStatusTags().find(t => t.id === id) || { id, label: id, color: '#6b7280' };
+  const own = allStatusTags().find(t => t.id === id);
+  if (own) return own;
+  for (const tags of Object.values(allUserStatusTags || {})) {
+    const t = (tags || []).find(x => x.id === id);
+    if (t) return t;
+  }
+  return { id, label: id, color: '#6b7280' };
 }
 function nextCustomTagId() {
   const nums = customStatusTags
@@ -1193,16 +1225,35 @@ function hexToRgba(hex, alpha) {
 }
 
 let dirHandle     = null;
-let db            = {};    // filename → { surahs }
+let db            = {};    // MY tags: filename → { surahs }
 let allUserStates = {};    // { 'a': { filename → {status,notes} }, ... }
-let currentUser   = localStorage.getItem('pictool-user') || 'a';
+// Machine-bound identity: chosen once per machine, never switched casually.
+let currentUser   = localStorage.getItem('pictool-identity') || null;
 let allImages     = [];
 let filtered      = [];
 let urlCache      = {};
 
-function canEditTags() { return true; }
-function canDelete()   { return currentUser === 'c'; }
-function canManage()   { return currentUser === 'c'; } // review mode: S only
+// Which OTHER users' data to show (display only — never affects writes)
+let viewOthers = new Set(JSON.parse(localStorage.getItem('pictool-viewothers') || 'null') || Object.keys(USERS));
+
+function visibleUsers() {
+  return Object.keys(USERS).filter(u => u === currentUser || viewOthers.has(u));
+}
+
+// Union of surah tags across visible users (mine + toggled-on others)
+function surahsFor(name) {
+  const out = new Set((db[name] && db[name].surahs) || []);
+  for (const u of visibleUsers()) {
+    if (u === currentUser) continue;
+    for (const s of ((allUserTags[u] || {})[name] || [])) out.add(s);
+  }
+  return [...out].sort((a, b) => a - b);
+}
+
+function canEditTags() { return !isReadOnly(); }
+function canDelete()   { return false; }  // photos are never deleted — folder copies must stay aligned
+function canManage()   { return !isReadOnly(); }
+function canReview()   { return currentUser === 'c'; } // review mode: S only
 
 function getState(user, name) {
   return (allUserStates[user] || {})[name]
@@ -1211,6 +1262,7 @@ function getState(user, name) {
 }
 function myState(name) { return getState(currentUser, name); }
 function setMyState(name, patch) {
+  if (isReadOnly()) return;
   if (!allUserStates[currentUser]) allUserStates[currentUser] = {};
   allUserStates[currentUser][name] = { ...getState(currentUser, name), ...patch };
 }
@@ -1220,9 +1272,12 @@ function setMyState(name, patch) {
 // across all users (done > partial > improve > repeated > custom tags > none)
 // rather than only the currently active user's own status.
 function effectiveStatus(name) {
-  const order = ['done', 'partial', 'improve', 'repeated', ...customStatusTags.map(t => t.id)];
+  const customIds = new Set(customStatusTags.map(t => t.id));
+  for (const u of visibleUsers())
+    for (const t of (allUserStatusTags[u] || [])) customIds.add(t.id);
+  const order = ['done', 'partial', 'improve', 'repeated', ...customIds];
   for (const st of order) {
-    if (Object.keys(USERS).some(u => (getState(u, name).status || 'none') === st)) return st;
+    if (visibleUsers().some(u => (getState(u, name).status || 'none') === st)) return st;
   }
   return 'none';
 }
@@ -1255,93 +1310,156 @@ async function idbPut(k,v) { const d=await idb(); return new Promise((res,rej)=>
 async function idbGet(k)   { const d=await idb(); return new Promise((res,rej)=>{ const tx=d.transaction('kv','readonly'); const r=tx.objectStore('kv').get(k); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
 
 // ═══════════════════════════════════════════════
-//  DATA.JSON
+//  PER-USER DATA FILES (v3 — single writer per file)
+//  Each user owns exactly one file: {label}_data.json.
+//  This machine only ever writes currentUser's file; other users'
+//  files arrive by explicit import and are never written by editing.
 // ═══════════════════════════════════════════════
+let allUserTags       = {};  // { userKey: { filename: [surahNums] } }
+let allUserStatusTags = {};  // { userKey: [{id,label,color}] }
+let userFileMeta      = {};  // { userKey: { present, saved } }
+
+function isReadOnly()  { return currentUser === 'c'; }
+function myLabel()     { return USERS[currentUser].label.toLowerCase(); }
+function dataFileName(userKey) { return `${USERS[userKey].label.toLowerCase()}_data.json`; }
+
+async function readJSONFile(name) {
+  const fh = await dirHandle.getFileHandle(name);
+  return JSON.parse(await (await fh.getFile()).text());
+}
+
 async function readDB() {
+  db = {}; allUserStates = {}; allUserTags = {}; allUserStatusTags = {}; userFileMeta = {};
+  for (const key of Object.keys(USERS)) {
+    userFileMeta[key] = { present: false, saved: null };
+    try {
+      const data = await readJSONFile(dataFileName(key));
+      if (data.user && data.user !== key) throw new Error('user mismatch');
+      allUserTags[key]       = data.tags || {};
+      allUserStates[key]     = data.states || {};
+      allUserStatusTags[key] = Array.isArray(data.statusTags) ? data.statusTags : [];
+      userFileMeta[key] = { present: true, saved: data.saved || null };
+    } catch {}
+  }
+
+  // Display-only fallback to legacy per-user files until that user sends a v3 file
+  for (const key of Object.keys(USERS)) {
+    if (userFileMeta[key].present) continue;
+    try {
+      const data = await readJSONFile(`${USERS[key].label.toLowerCase()}_states.json`);
+      allUserStates[key] = data.images || {};
+    } catch {}
+    if (key === 'b' && !Object.keys(allUserStates.b || {}).length) {
+      try { allUserStates.b = (await readJSONFile('states.json')).images || {}; } catch {}
+    }
+  }
+
+  // First run on this machine: build my own file from the legacy shared files
+  if (!userFileMeta[currentUser].present) await migrateLegacyToMine();
+
+  // Aliases for my own data — all editing code works on these
   db = {};
-  allUserStates = {};
+  for (const [name, surahs] of Object.entries(allUserTags[currentUser] || {}))
+    db[name] = { surahs: Array.isArray(surahs) ? [...surahs] : [] };
+  customStatusTags = [...(allUserStatusTags[currentUser] || [])];
+  renderSyncInfo();
+}
+
+async function migrateLegacyToMine() {
+  const tags = {};
   try {
-    const fh = await dirHandle.getFileHandle('tags.json');
-    const tags = JSON.parse(await (await fh.getFile()).text()).images || {};
-    for (const [name, surahs] of Object.entries(tags))
-      db[name] = { surahs: Array.isArray(surahs) ? surahs : [] };
+    const legacy = (await readJSONFile('tags.json')).images || {};
+    for (const [name, surahs] of Object.entries(legacy))
+      if (Array.isArray(surahs) && surahs.length) tags[name] = [...surahs];
   } catch {}
+  let statusTags = [];
+  try { statusTags = (await readJSONFile('status_tags.json')).tags || []; } catch {}
 
-  customStatusTags = [];
-  try {
-    const fh = await dirHandle.getFileHandle('status_tags.json');
-    const data = JSON.parse(await (await fh.getFile()).text());
-    customStatusTags = Array.isArray(data.tags) ? data.tags : [];
-  } catch {}
-  // Read all *_states.json (one per user), match by display label
-  const labelToKey = Object.fromEntries(Object.entries(USERS).map(([k, v]) => [v.label.toLowerCase(), k]));
-  for await (const [fname, handle] of dirHandle.entries()) {
-    const m = fname.match(/^([a-z]+)_states\.json$/i);
-    if (!m || handle.kind !== 'file') continue;
-    const userKey = labelToKey[m[1].toLowerCase()];
-    if (!userKey) continue;
-    try {
-      const data = JSON.parse(await (await handle.getFile()).text());
-      allUserStates[userKey] = data.images || {};
-    } catch {}
-  }
+  allUserTags[currentUser]       = tags;
+  allUserStatusTags[currentUser] = Array.isArray(statusTags) ? statusTags : [];
+  allUserStates[currentUser]     = allUserStates[currentUser] || {};
 
-  // Load legacy states.json into user Z (b) if no b_states.json exists yet
-  if (!allUserStates['b']) {
-    try {
-      const fh = await dirHandle.getFileHandle('states.json');
-      const data = JSON.parse(await (await fh.getFile()).text());
-      if (data.images && Object.keys(data.images).length) allUserStates['b'] = data.images;
-    } catch {}
-  }
-
-  // Migrate from old data.json if no tags at all
-  if (!Object.keys(db).length) {
-    try {
-      const fh = await dirHandle.getFileHandle('data.json');
-      const old = JSON.parse(await (await fh.getFile()).text()).images || {};
-      for (const [name, m] of Object.entries(old)) {
-        db[name] = { surahs: m.surahs || [] };
-        setMyState(name, { status: m.status || 'none', notes: m.notes || '' });
-      }
-      if (Object.keys(db).length) { await writeTagsDB(); await writeStatesDB(); showToast('تم الترقية إلى صيغة الملفين ✓'); }
-    } catch {}
+  const hasData = Object.keys(tags).length || statusTags.length || Object.keys(allUserStates[currentUser]).length;
+  if (!isReadOnly() && hasData) {
+    db = {};
+    for (const [name, surahs] of Object.entries(tags)) db[name] = { surahs: [...surahs] };
+    customStatusTags = [...allUserStatusTags[currentUser]];
+    await writeMyData();
+    showToast(`تم إنشاء ملفك الخاص ${dataFileName(currentUser)} من الملفات القديمة ✓`);
   }
 }
 
-async function writeTagsDB() {
-  const images = {};
+// The ONLY function that writes a data file on this machine — and only my own.
+async function writeMyData() {
+  if (!currentUser || isReadOnly() || !dirHandle) return;
+  const tags = {};
   for (const [name, m] of Object.entries(db))
-    if (m.surahs && m.surahs.length) images[name] = m.surahs;
-  const fh = await dirHandle.getFileHandle('tags.json', { create: true });
-  const w  = await fh.createWritable();
-  await w.write(JSON.stringify({ version: 1, saved: new Date().toISOString(), images }, null, 2));
-  await w.close();
-}
-
-async function writeStatesDB() {
-  const images = {};
+    if (m.surahs && m.surahs.length) tags[name] = m.surahs;
+  const states = {};
   for (const [name, s] of Object.entries(allUserStates[currentUser] || {})) {
     if ((s.status && s.status !== 'none') || s.notes || s.units)
-      images[name] = { status: s.status || 'none', notes: s.notes || '', units: s.units || 0 };
+      states[name] = { status: s.status || 'none', notes: s.notes || '', units: s.units || 0 };
   }
-  const label = USERS[currentUser].label.toLowerCase();
-  const fh = await dirHandle.getFileHandle(`${label}_states.json`, { create: true });
+  const payload = {
+    version: 3, app: 'pictool',
+    user: currentUser, label: USERS[currentUser].label,
+    saved: new Date().toISOString(),
+    tags, statusTags: customStatusTags, states,
+  };
+  const fh = await dirHandle.getFileHandle(dataFileName(currentUser), { create: true });
   const w  = await fh.createWritable();
-  await w.write(JSON.stringify({ version: 1, user: currentUser, saved: new Date().toISOString(), images }, null, 2));
+  await w.write(JSON.stringify(payload, null, 2));
+  await w.close();
+  allUserTags[currentUser]       = tags;
+  allUserStatusTags[currentUser] = customStatusTags;
+  userFileMeta[currentUser]      = { present: true, saved: payload.saved };
+  renderSyncInfo();
+}
+
+// Legacy entry points, all funneling into the single-writer file
+async function writeDB()           { await writeMyData(); }
+async function writeTagsDB()       { await writeMyData(); }
+async function writeStatesDB()     { await writeMyData(); }
+async function writeStatusTagsDB() { await writeMyData(); }
+
+// ═══════════════════════════════════════════════
+//  BACKUPS (backups/ subfolder, timestamped, never overwritten)
+// ═══════════════════════════════════════════════
+function backupTimestamp(d = new Date()) {
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}`;
+}
+
+async function backupsDir() { return dirHandle.getDirectoryHandle('backups', { create: true }); }
+
+async function writeBackupFile(fname, text) {
+  const bdir = await backupsDir();
+  const fh = await bdir.getFileHandle(fname, { create: true });
+  const w  = await fh.createWritable();
+  await w.write(text);
   await w.close();
 }
 
-async function writeStatusTagsDB() {
-  const fh = await dirHandle.getFileHandle('status_tags.json', { create: true });
-  const w  = await fh.createWritable();
-  await w.write(JSON.stringify({ version: 1, saved: new Date().toISOString(), tags: customStatusTags }, null, 2));
-  await w.close();
-}
-
-async function writeDB() {
-  await writeTagsDB();
-  await writeStatesDB();
+// Snapshot my current on-disk file before this session writes anything.
+// Skipped when the newest backup already holds identical content.
+async function backupMyFile() {
+  if (!currentUser || isReadOnly()) return;
+  let text;
+  try {
+    const fh = await dirHandle.getFileHandle(dataFileName(currentUser));
+    text = await (await fh.getFile()).text();
+  } catch { return; }
+  try {
+    const bdir = await backupsDir();
+    let newest = null;
+    for await (const [n, h] of bdir.entries())
+      if (h.kind === 'file' && n.startsWith(myLabel() + '_') && (!newest || n > newest)) newest = n;
+    if (newest) {
+      const prev = await (await (await bdir.getFileHandle(newest)).getFile()).text();
+      if (prev === text) return;
+    }
+  } catch {}
+  await writeBackupFile(`${myLabel()}_${backupTimestamp()}.json`, text);
 }
 
 let reviewedSet = new Set();
@@ -1366,9 +1484,11 @@ async function openFolder() {
 }
 
 async function loadApp() {
+  if (!currentUser) { showIdentityPicker(); return; }  // resumes via chooseIdentity()
   document.getElementById('welcome').classList.add('hidden');
   ['appHeader','filterBar','statsBar','grid'].forEach(id => document.getElementById(id).classList.remove('hidden'));
   await readDB();
+  await backupMyFile();  // snapshot last-known-good state before this session writes anything
   await scanImages();
   renderUserFilterBtns();
   renderStatusFilterOptions();
@@ -1415,7 +1535,7 @@ let fUsers = new Set();
 function renderUserFilterBtns() {
   const wrap = document.getElementById('userFilterBtns');
   if (!wrap) return;
-  wrap.innerHTML = Object.entries(USERS).map(([key, u]) =>
+  wrap.innerHTML = Object.entries(USERS).filter(([key]) => visibleUsers().includes(key)).map(([key, u]) =>
     `<button class="uf-btn${fUsers.has(key) ? ' active' : ''}" id="ufBtn-${key}"
       style="${fUsers.has(key) ? `background:${u.color};border-color:${u.color}` : ''}"
       onclick="toggleUserFilter('${key}')">${u.label}</button>`
@@ -1435,12 +1555,10 @@ function applyFilters() {
   const nameQ      = (document.getElementById('fNameSearch')?.value || '').trim().toLowerCase();
   filtered = allImages.filter(name => {
     if (nameQ && !name.toLowerCase().includes(nameQ)) return false;
-    const m      = db[name] || {};
-    const surahs = m.surahs || [];
+    const surahs = surahsFor(name);
     if (tagCount === '0' && surahs.length !== 0) return false;
     if (tagCount === '1' && surahs.length !== 1) return false;
     if (tagCount === '2' && surahs.length !== 2) return false;
-    if (sf !== 'all' && effectiveStatus(name) !== sf) return false;
     if (fSurahs.length > 0) {
       if (exactSurahs) {
         if (surahs.length === 0) return false;
@@ -1450,11 +1568,19 @@ function applyFilters() {
       }
     }
     if (fUsers.size > 0) {
-      const hasActivity = [...fUsers].some(u => {
-        const st = (allUserStates[u] || {})[name]?.status;
-        return st && st !== 'none';
-      });
-      if (!hasActivity) return false;
+      if (sf !== 'all') {
+        // A specific user (or users) is selected: match THEIR status, not the aggregate.
+        const matches = [...fUsers].some(u => (getState(u, name).status || 'none') === sf);
+        if (!matches) return false;
+      } else {
+        const hasActivity = [...fUsers].some(u => {
+          const st = getState(u, name).status;
+          return st && st !== 'none';
+        });
+        if (!hasActivity) return false;
+      }
+    } else if (sf !== 'all' && effectiveStatus(name) !== sf) {
+      return false;
     }
     return true;
   });
@@ -1515,10 +1641,18 @@ function renderGrid() {
       ? surahs.map(n=>`<span class="surah-chip">${n}. ${SMAP.get(n)||''}<span class="chip-x" onclick="event.stopPropagation();removeSurahTag(${JSON.stringify(name)},${n})" title="حذف هذه السورة">×</span></span>`).join('')
       : `<span style="color:#ccc;font-size:10px">لا سور محددة</span>`;
 
+    const myTagSet = new Set(surahs);
+    const extraChips = Object.keys(USERS)
+      .filter(u => u !== currentUser && viewOthers.has(u))
+      .flatMap(u => ((allUserTags[u] || {})[name] || [])
+        .filter(s => !myTagSet.has(s))
+        .map(s => `<span class="surah-chip" style="border:1px dashed ${USERS[u].color};color:${USERS[u].color}" title="وسم ${USERS[u].label}">${s}. ${SMAP.get(s)||''}</span>`))
+      .join('');
+
     const noteHTML = notes ? `<div class="card-note" title="${h(notes)}">${h(notes)}</div>` : '';
 
     const otherChips = Object.entries(USERS)
-      .filter(([u]) => u !== currentUser && (getState(u, name).status||'none') !== 'none')
+      .filter(([u]) => u !== currentUser && viewOthers.has(u) && (getState(u, name).status||'none') !== 'none')
       .map(([u, ud]) => {
         const st = getState(u, name).status;
         const meta = statusMeta(st);
@@ -1541,7 +1675,7 @@ function renderGrid() {
       ${badge}
       <div class="card-body">
         <div class="card-name" title="${h(name)}">${h(name)}</div>
-        <div class="card-tags">${chips}</div>${noteHTML}${otherRow}
+        <div class="card-tags">${chips}${extraChips}</div>${noteHTML}${otherRow}
       </div>`;
     attachLongPress(card, name);
     grid.appendChild(card);
@@ -1802,6 +1936,8 @@ async function openModal(name) {
   const mWrap = document.getElementById('mWrap');
   mWrap.style.pointerEvents = canEditTags() ? '' : 'none';
   mWrap.style.opacity = canEditTags() ? '' : '0.6';
+  document.getElementById('modalNotes').readOnly = !canEditTags();
+  document.getElementById('modalUnits').readOnly = !canEditTags();
   document.getElementById('modalDeleteBtn').style.display = canDelete() ? '' : 'none';
   updateTags('m');
   updateStatusUI();
@@ -1826,6 +1962,7 @@ function closeModal() {
 
 async function saveImage() {
   if (!mFile) return;
+  if (isReadOnly()) { showToast('وضع القراءة فقط — لا يُحفظ شيء'); closeModal(); return; }
   if (canEditTags()) db[mFile] = { surahs: [...mSurahs] };
   setMyState(mFile, {
     status: mStatus,
@@ -1878,6 +2015,7 @@ const eBody   = () => document.getElementById('editorBody');
 
 async function openEditor() {
   if (!mFile) return;
+  if (isReadOnly()) { showToast('وضع القراءة فقط — تعديل الصور معطّل'); return; }
   editorFile = mFile;
   let url = urlCache[mFile];
   if (!url) {
@@ -2036,6 +2174,7 @@ function applyCrop() {
 }
 
 async function saveEditorFile() {
+  if (isReadOnly()) { showToast('وضع القراءة فقط'); return; }
   const mime = editorFile?.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
   eCanvas().toBlob(async blob => {
     try {
@@ -2244,7 +2383,7 @@ function renderStats() {
   const surahDone   = new Map();
   for (const name of allImages) {
     const isDone = effectiveStatus(name) === 'done';
-    for (const s of (db[name]?.surahs || [])) {
+    for (const s of surahsFor(name)) {
       surahCounts.set(s, (surahCounts.get(s) || 0) + 1);
       if (isDone) surahDone.set(s, (surahDone.get(s) || 0) + 1);
     }
@@ -2362,7 +2501,7 @@ function renderDetailedStats() {
   let picT1 = 0, picT2 = 0, picT3 = 0; // picture counts by tag-count bucket (each picture counted once)
 
   for (const name of allImages) {
-    const surahs = db[name]?.surahs || [];
+    const surahs = surahsFor(name);
     const n = surahs.length;
     if (n === 0) continue;
     if (n === 1) picT1++;
@@ -2647,6 +2786,13 @@ function renderViewMode() {
   document.getElementById('viewUnitsInput').value = myS.units || '';
   renderViewStatusBtns();
   renderViewOtherUsers();
+
+  const ro = isReadOnly();
+  noteEl.readOnly = ro;
+  document.getElementById('viewUnitsInput').readOnly = ro;
+  const vsb = document.getElementById('viewStatusBtns');
+  vsb.style.pointerEvents = ro ? 'none' : '';
+  vsb.style.opacity = ro ? '.55' : '';
 }
 
 
@@ -2733,7 +2879,7 @@ function autoResizeNote(el) {
 
 function renderViewOtherUsers() {
   const name = vmCurrentName; if (!name) return;
-  const others = Object.keys(USERS).filter(u => u !== currentUser);
+  const others = Object.keys(USERS).filter(u => u !== currentUser && viewOthers.has(u));
 
   const realState = (u, n) => (allUserStates[u] || {})[n] || null;
 
@@ -2744,9 +2890,13 @@ function renderViewOtherUsers() {
       const st = s?.status || 'none';
       const meta = st === 'none' ? { label: 'لم يُبدأ', color: '#475569' } : statusMeta(st);
       const units = s?.units ? `<span style="color:#94a3b8;margin-right:4px">(${s.units} وحدة)</span>` : '';
+      const uTags = (allUserTags[u] || {})[name] || [];
+      const tagsHtml = uTags.length
+        ? `<span style="color:#94a3b8;margin-right:4px;font-size:11px">📖 ${uTags.map(n => `${n}. ${SMAP.get(n) || ''}`).join('، ')}</span>`
+        : '';
       return `<span class="vm-user-status-item">
         <span class="vm-user-initial" style="background:${USERS[u].color}">${USERS[u].label}</span>
-        <span style="color:${meta.color}">${h(meta.label)}</span>${units}
+        <span style="color:${meta.color}">${h(meta.label)}</span>${units}${tagsHtml}
       </span>`;
     }).join('');
     bar.classList.remove('hidden');
@@ -2764,33 +2914,226 @@ function renderViewOtherUsers() {
   }
 }
 
-function switchUser(user) {
+// ═══════════════════════════════════════════════
+//  IDENTITY (machine-bound) + VIEW TOGGLES + SYNC INFO
+// ═══════════════════════════════════════════════
+function showIdentityPicker() {
+  const body = document.getElementById('identityBody');
+  body.innerHTML = `
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.7">
+      يُحفظ هذا الاختيار على هذا الجهاز ويحدد الملف الوحيد الذي يكتب فيه التطبيق.
+      كل مستخدم يكتب في ملفه الخاص فقط، وبيانات الآخرين تصل بالاستيراد اليدوي.
+    </p>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+      ${Object.entries(USERS).map(([k, u]) => `
+        <button class="btn btn-primary" style="background:${u.color};border-color:${u.color};font-size:16px;padding:10px 26px"
+          onclick="chooseIdentity('${k}')">${u.label}${k === 'c' ? ' — قراءة فقط' : ''}</button>`).join('')}
+    </div>`;
+  document.getElementById('identityOverlay').classList.remove('hidden');
+}
+
+async function chooseIdentity(user) {
   if (!USERS[user]) return;
+  const extra = user === 'c' ? '\n(وضع القراءة فقط — لن يكتب هذا الجهاز أي بيانات)' : '';
+  if (!confirm(`تأكيد: أنت "${USERS[user].label}" على هذا الجهاز؟${extra}`)) return;
   currentUser = user;
-  localStorage.setItem('pictool-user', user);
+  localStorage.setItem('pictool-identity', user);
+  document.getElementById('identityOverlay').classList.add('hidden');
+  if (dirHandle) await loadApp();
+}
+
+function changeIdentity() {
+  if (!confirm('تغيير الهوية إجراء حسّاس: سيكتب هذا الجهاز في ملف مستخدم آخر وقد يفسد بياناته.\nلا تتابع إلا إذا اخترت الهوية الخاطئة عن طريق الخطأ.\n\nهل تريد المتابعة؟')) return;
+  showIdentityPicker();
+}
+
+function toggleViewUser(user) {
+  if (user === currentUser) return;
+  viewOthers.has(user) ? viewOthers.delete(user) : viewOthers.add(user);
+  localStorage.setItem('pictool-viewothers', JSON.stringify([...viewOthers]));
   updateUserSelector();
+  renderUserFilterBtns();
   applyFilters();
-  if (vmCurrentName) {
-    const myS = myState(vmCurrentName);
-    vmStatus = myS.status || 'none';
-    const noteEl = document.getElementById('viewNoteInput');
-    noteEl.value = myS.notes || '';
-    autoResizeNote(noteEl);
-    renderViewStatusBtns();
-    renderViewOtherUsers();
-  }
+  if (vmCurrentName) renderViewOtherUsers();
 }
 
 function updateUserSelector() {
-  Object.keys(USERS).forEach(u => {
-    const btn = document.getElementById('uBtn-' + u);
-    if (!btn) return;
-    const isActive = u === currentUser;
-    btn.classList.toggle('active', isActive);
-    btn.style.background = isActive ? USERS[u].color : '';
-    btn.textContent = USERS[u].label;
-  });
-  document.getElementById('reviewBtn').classList.toggle('hidden', !canManage());
+  const badge = document.getElementById('identityBadge');
+  if (currentUser) {
+    badge.textContent = USERS[currentUser].label + (isReadOnly() ? ' 👁' : '');
+    badge.style.background = USERS[currentUser].color;
+    badge.style.borderColor = USERS[currentUser].color;
+  }
+  document.getElementById('viewUserBtns').innerHTML = Object.entries(USERS)
+    .filter(([k]) => k !== currentUser)
+    .map(([k, u]) => `<button class="user-btn${viewOthers.has(k) ? ' active' : ''}"
+      style="${viewOthers.has(k) ? `background:${u.color};border-color:${u.color}` : ''}"
+      onclick="toggleViewUser('${k}')" title="إظهار/إخفاء بيانات ${u.label}">${u.label}</button>`).join('');
+  document.getElementById('reviewBtn').classList.toggle('hidden', !canReview());
+  document.getElementById('manageTagsBtn').classList.toggle('hidden', !canManage());
+  document.getElementById('exportBtn').classList.toggle('hidden', isReadOnly());
+  renderSyncInfo();
+}
+
+function renderSyncInfo() {
+  const el = document.getElementById('syncInfo');
+  if (!el || !currentUser) return;
+  const parts = [];
+  for (const [k, u] of Object.entries(USERS)) {
+    if (k === currentUser || !viewOthers.has(k)) continue;
+    const meta = userFileMeta[k];
+    if (!meta || !meta.present || !meta.saved) {
+      parts.push(`<span style="color:#94a3b8">${u.label}: لا ملف بعد</span>`);
+      continue;
+    }
+    const d = new Date(meta.saved);
+    const days = (Date.now() - d.getTime()) / 86400000;
+    const color = days > 7 ? '#dc2626' : days > 3 ? '#d97706' : 'var(--muted)';
+    parts.push(`<span style="color:${color};font-weight:600" title="آخر حفظ لبيانات ${u.label}">بيانات ${u.label}: ${d.toLocaleDateString('ar-EG', { day: 'numeric', month: 'numeric' })} ${d.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</span>`);
+  }
+  el.innerHTML = parts.join(' · ');
+}
+
+// ═══════════════════════════════════════════════
+//  EXPORT / IMPORT (identity lives INSIDE the file, never in its name)
+// ═══════════════════════════════════════════════
+async function exportMyData() {
+  if (isReadOnly()) { showToast('وضع القراءة فقط — لا يوجد ملف لتصديره'); return; }
+  await writeMyData();
+  let text;
+  try {
+    const fh = await dirHandle.getFileHandle(dataFileName(currentUser));
+    text = await (await fh.getFile()).text();
+  } catch { showToast('لا يوجد ملف بيانات بعد'); return; }
+  const blob = new Blob([text], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${myLabel()}_data_${backupTimestamp()}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast('تم التصدير — أرسل الملف للمستخدم الآخر 📤');
+}
+
+function triggerImport() { document.getElementById('importFileInput').click(); }
+
+async function onImportFile(ev) {
+  const file = ev.target.files[0];
+  ev.target.value = '';
+  if (!file || !dirHandle) return;
+  let data;
+  try { data = JSON.parse(await file.text()); }
+  catch { alert('الملف ليس ملف JSON صالحاً'); return; }
+  const user = data.user;
+  if (!user || !USERS[user] || data.app !== 'pictool' || (data.version || 0) < 3) {
+    alert('هذا ليس ملف بيانات صالحاً من بيكتول v3 (الملف يجب أن يحمل هوية صاحبه بداخله)');
+    return;
+  }
+  const label = USERS[user].label;
+  const incoming = data.saved ? new Date(data.saved) : null;
+
+  if (user === currentUser) {
+    // Importing my own file = restore path; snapshot current first so restore never destroys.
+    if (isReadOnly()) { alert('وضع القراءة فقط — لا بيانات خاصة بك لاستعادتها'); return; }
+    if (!confirm(`هذا ملفك أنت (${label}).\nسيتم استبدال بياناتك الحالية بمحتواه بعد أخذ نسخة احتياطية.\nمتابعة؟`)) return;
+    await backupMyFile();
+    await writeRawUserFile(user, data);
+    await refreshImages();
+    showToast('تمت استعادة بياناتك من الملف المستورد ✓');
+    return;
+  }
+
+  // Another user's file: only ever replaces THAT user's local copy — never mine.
+  const cur = userFileMeta[user];
+  if (cur && cur.present && cur.saved && incoming && incoming <= new Date(cur.saved)) {
+    if (!confirm(`تنبيه: هذا الملف (${incoming.toLocaleString('ar-EG')}) أقدم من بيانات ${label} الموجودة لديك (${new Date(cur.saved).toLocaleString('ar-EG')}).\nاستيراده سيُرجع عرضك لبيانات ${label} إلى الوراء. متابعة؟`)) return;
+  }
+  await writeRawUserFile(user, data);
+  await writeBackupFile(`import_${label.toLowerCase()}_${backupTimestamp()}.json`, JSON.stringify(data, null, 2));
+  await refreshImages();
+  showToast(`تم استيراد بيانات ${label} ✓`);
+}
+
+// Import/restore path: writes a complete v3 payload to that user's local file.
+async function writeRawUserFile(user, data) {
+  const fh = await dirHandle.getFileHandle(dataFileName(user), { create: true });
+  const w  = await fh.createWritable();
+  await w.write(JSON.stringify(data, null, 2));
+  await w.close();
+}
+
+// ═══════════════════════════════════════════════
+//  VERSIONS VIEWER + SAFE RESTORE
+// ═══════════════════════════════════════════════
+function closeVersions() { document.getElementById('versionsOverlay').classList.add('hidden'); }
+function onVersionsOverlayClick(e) { if (e.target.id === 'versionsOverlay') closeVersions(); }
+
+async function openVersions() {
+  const body = document.getElementById('versionsBody');
+  body.innerHTML = '<div class="dstats-empty">جاري التحميل…</div>';
+  document.getElementById('versionsOverlay').classList.remove('hidden');
+  const rows = [];
+  try {
+    const bdir = await backupsDir();
+    for await (const [n, hnd] of bdir.entries()) {
+      if (hnd.kind !== 'file' || !n.endsWith('.json')) continue;
+      const info = { name: n, user: null, saved: null, tags: 0, states: 0, notes: 0 };
+      try {
+        const data = JSON.parse(await (await hnd.getFile()).text());
+        if (data.user && USERS[data.user]) info.user = data.user;
+        info.saved  = data.saved || null;
+        info.tags   = Object.keys(data.tags || {}).length;
+        const sts   = Object.values(data.states || {});
+        info.states = sts.filter(s => s.status && s.status !== 'none').length;
+        info.notes  = sts.filter(s => s.notes).length;
+      } catch {}
+      rows.push(info);
+    }
+  } catch {}
+  rows.sort((a, b) => b.name.localeCompare(a.name));
+  if (!rows.length) { body.innerHTML = '<div class="dstats-empty">لا توجد نسخ احتياطية بعد</div>'; return; }
+
+  const td = 'padding:6px 10px;border-bottom:1px solid var(--border);text-align:center;font-size:12px';
+  body.innerHTML = `
+    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
+      <thead><tr>
+        <th style="${td}">الملف</th><th style="${td}">المستخدم</th><th style="${td}">تاريخ الحفظ</th>
+        <th style="${td}">سور</th><th style="${td}">حالات</th><th style="${td}">ملاحظات</th><th style="${td}"></th>
+      </tr></thead>
+      <tbody>${rows.map(r => {
+        const u = r.user ? USERS[r.user] : null;
+        const canRestore = r.user && (r.user !== currentUser || !isReadOnly());
+        return `<tr>
+          <td style="${td}" dir="ltr">${h(r.name)}</td>
+          <td style="${td}">${u ? `<span style="color:${u.color};font-weight:700">${u.label}</span>` : '؟'}</td>
+          <td style="${td}" dir="ltr">${r.saved ? new Date(r.saved).toLocaleString('ar-EG') : '—'}</td>
+          <td style="${td}">${r.tags}</td><td style="${td}">${r.states}</td><td style="${td}">${r.notes}</td>
+          <td style="${td}">${canRestore ? `<button class="btn btn-ghost" onclick="restoreVersion('${h(r.name)}')">↩ استعادة</button>` : ''}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table></div>
+    <p style="font-size:12px;color:var(--muted);margin-top:10px">الاستعادة تأخذ نسخة احتياطية من الوضع الحالي أولاً — لا يمكن أن تفقد شيئاً بالاستعادة.</p>`;
+}
+
+async function restoreVersion(fname) {
+  let data;
+  try {
+    const bdir = await backupsDir();
+    data = JSON.parse(await (await (await bdir.getFileHandle(fname)).getFile()).text());
+  } catch { alert('تعذّرت قراءة النسخة'); return; }
+  const user = data.user;
+  if (!user || !USERS[user]) { alert('نسخة غير صالحة (بدون هوية صاحبها)'); return; }
+  const label = USERS[user].label;
+  if (user === currentUser) {
+    if (isReadOnly()) return;
+    if (!confirm(`استعادة بياناتك أنت (${label}) من:\n${fname}\nسيتم أخذ نسخة احتياطية من الوضع الحالي أولاً.`)) return;
+    await backupMyFile();
+  } else {
+    if (!confirm(`استعادة النسخة المعروضة لديك من بيانات ${label} من:\n${fname}؟`)) return;
+  }
+  await writeRawUserFile(user, data);
+  closeVersions();
+  await refreshImages();
+  showToast('تمت الاستعادة ✓');
 }
 
 
@@ -2894,6 +3237,7 @@ function clampVmIndex() {
 
 // ─ Delete / editor from view ─
 async function deleteFromView() {
+  if (!canDelete()) { showToast('الحذف معطّل — نسخ المجلد يجب أن تبقى متطابقة'); return; }
   const name = vmCurrentName; if (!name) return;
   if (!confirm(`هل تريد حذف هذه الصورة نهائياً؟\n${name}`)) return;
   try {
