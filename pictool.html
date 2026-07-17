@@ -799,7 +799,7 @@ input[type=range].pen-size {
 
 <!-- ── HEADER ── -->
 <div id="appHeader" class="header hidden">
-  <span class="logo">📖 بيكتول <span style="font-size:14px;font-weight:400;opacity:.5;letter-spacing:.02em">v3.0</span></span>
+  <span class="logo">📖 بيكتول <span style="font-size:14px;font-weight:400;opacity:.5;letter-spacing:.02em">v3.1</span></span>
   <span style="font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap">أنا:</span>
   <div class="user-sel">
     <button class="user-btn active" id="identityBadge" onclick="changeIdentity()" title="هويتك على هذا الجهاز — التغيير محمي"></button>
@@ -1233,21 +1233,18 @@ let allImages     = [];
 let filtered      = [];
 let urlCache      = {};
 
-// Which OTHER users' data to show (display only — never affects writes)
+// Which OTHER users' STATUS/NOTES to show (display only — never affects writes).
+// Surah tags are shared truth and always merged from everyone; this toggle
+// governs opinions (status/notes/units), not facts (tags).
 let viewOthers = new Set(JSON.parse(localStorage.getItem('pictool-viewothers') || 'null') || Object.keys(USERS));
 
 function visibleUsers() {
   return Object.keys(USERS).filter(u => u === currentUser || viewOthers.has(u));
 }
 
-// Union of surah tags across visible users (mine + toggled-on others)
+// Surah tags are shared truth: db holds the merged result from every user's edits.
 function surahsFor(name) {
-  const out = new Set((db[name] && db[name].surahs) || []);
-  for (const u of visibleUsers()) {
-    if (u === currentUser) continue;
-    for (const s of ((allUserTags[u] || {})[name] || [])) out.add(s);
-  }
-  return [...out].sort((a, b) => a - b);
+  return (db[name] && db[name].surahs) || [];
 }
 
 function canEditTags() { return !isReadOnly(); }
@@ -1315,9 +1312,113 @@ async function idbGet(k)   { const d=await idb(); return new Promise((res,rej)=>
 //  This machine only ever writes currentUser's file; other users'
 //  files arrive by explicit import and are never written by editing.
 // ═══════════════════════════════════════════════
-let allUserTags       = {};  // { userKey: { filename: [surahNums] } }
+// Surah tags are a shared FACT (a picture either contains a surah or it doesn't),
+// unlike status/notes/units which are per-user OPINIONS. So every user may correct
+// any tag, yet no user's file may be written by anyone else. Both are satisfied by
+// storing tag EDITS rather than tag state: each user records, per picture+surah,
+// their own add/delete stamped with a time. The displayed tag set is recomputed at
+// read time by taking the latest edit for each picture+surah across all users
+// (a last-writer-wins set). Consequences that matter:
+//   • deletion is expressible, so corrections stick instead of bouncing back;
+//   • merging happens in memory, never on disk — single-writer safety is intact;
+//   • importing a stale file cannot resurrect a tag: old edits simply lose;
+//   • import order is irrelevant — same files in, same tags out.
+// Delete records are retained forever; they are what makes a removal durable.
+const TAG_ADD = 'a', TAG_DEL = 'd';
+const LEGACY_TAG_TS = '2000-01-01T00:00:00.000Z'; // any real edit must beat migrated data
+
+let allUserTagOps     = {};  // { userKey: { filename: { surahNum: { op, at } } } }
+let tagProv           = {};  // filename → { surahNum: { user, at, op } } — winning edit
 let allUserStatusTags = {};  // { userKey: [{id,label,color}] }
 let userFileMeta      = {};  // { userKey: { present, saved } }
+
+// Accepts both the v3.1 edit format and the v3.0 plain {file: [surahs]} lists.
+function normalizeTagOps(raw, fallbackTs) {
+  const out = {};
+  for (const [name, val] of Object.entries(raw || {})) {
+    const rec = {};
+    if (Array.isArray(val)) {
+      for (const s of val) {
+        if (Number.isFinite(+s)) rec[+s] = { op: TAG_ADD, at: fallbackTs || LEGACY_TAG_TS };
+      }
+    } else if (val && typeof val === 'object') {
+      for (const [sNum, r] of Object.entries(val)) {
+        if (!Number.isFinite(+sNum) || !r || typeof r !== 'object') continue;
+        const op = r.op === TAG_DEL ? TAG_DEL : TAG_ADD;
+        rec[+sNum] = { op, at: typeof r.at === 'string' ? r.at : (fallbackTs || LEGACY_TAG_TS) };
+      }
+    }
+    if (Object.keys(rec).length) out[name] = rec;
+  }
+  return out;
+}
+
+// Later edit wins; ties broken by user key so every machine agrees.
+function tagOpWins(rec, user, cur) {
+  if (rec.at !== cur.at) return rec.at > cur.at;
+  return user > cur.user;
+}
+
+// Recompute the merged tag truth (db) + provenance from every user's edits.
+function computeMergedTags() {
+  db = {}; tagProv = {};
+  const winners = {};
+  for (const [u, files] of Object.entries(allUserTagOps)) {
+    for (const [name, ops] of Object.entries(files || {})) {
+      for (const [sNum, rec] of Object.entries(ops || {})) {
+        if (!winners[name]) winners[name] = {};
+        const cur = winners[name][sNum];
+        if (!cur || tagOpWins(rec, u, cur)) winners[name][sNum] = { op: rec.op, at: rec.at, user: u };
+      }
+    }
+  }
+  for (const [name, m] of Object.entries(winners)) {
+    const surahs = [];
+    for (const [sNum, w] of Object.entries(m)) if (w.op === TAG_ADD) surahs.push(+sNum);
+    surahs.sort((a, b) => a - b);
+    db[name] = { surahs };
+    tagProv[name] = m;
+  }
+}
+
+function myTagOps() {
+  if (!allUserTagOps[currentUser]) allUserTagOps[currentUser] = {};
+  return allUserTagOps[currentUser];
+}
+
+// Record my add/delete for one picture+surah, then re-merge.
+async function setTagOp(name, surah, op) {
+  if (!canEditTags()) return;
+  const mine = myTagOps();
+  if (!mine[name]) mine[name] = {};
+  mine[name][surah] = { op, at: new Date().toISOString() };
+  computeMergedTags();
+  await writeMyData();
+}
+
+// Apply a whole chosen set (modal / quick-assign) as a diff against merged truth.
+async function applyTagSet(name, nextSurahs) {
+  if (!canEditTags()) return;
+  const cur  = new Set(surahsFor(name));
+  const next = new Set(nextSurahs.map(Number));
+  const at   = new Date().toISOString();
+  const mine = myTagOps();
+  if (!mine[name]) mine[name] = {};
+  let changed = false;
+  for (const s of next) if (!cur.has(s))  { mine[name][s] = { op: TAG_ADD, at }; changed = true; }
+  for (const s of cur)  if (!next.has(s)) { mine[name][s] = { op: TAG_DEL, at }; changed = true; }
+  if (!changed) return;
+  computeMergedTags();
+  await writeMyData();
+}
+
+// "2. البقرة — عدّلها A في 17/7" for tooltips, so a flipped tag is never mysterious.
+function tagProvText(name, surah) {
+  const w = (tagProv[name] || {})[surah];
+  if (!w || !USERS[w.user]) return '';
+  if (w.at === LEGACY_TAG_TS) return 'من البيانات القديمة';
+  return `${w.op === TAG_DEL ? 'حذفها' : 'أضافها'} ${USERS[w.user].label} — ${new Date(w.at).toLocaleString('ar-EG')}`;
+}
 
 function isReadOnly()  { return currentUser === 'c'; }
 function myLabel()     { return USERS[currentUser].label.toLowerCase(); }
@@ -1329,13 +1430,13 @@ async function readJSONFile(name) {
 }
 
 async function readDB() {
-  db = {}; allUserStates = {}; allUserTags = {}; allUserStatusTags = {}; userFileMeta = {};
+  db = {}; allUserStates = {}; allUserTagOps = {}; allUserStatusTags = {}; userFileMeta = {};
   for (const key of Object.keys(USERS)) {
     userFileMeta[key] = { present: false, saved: null };
     try {
       const data = await readJSONFile(dataFileName(key));
       if (data.user && data.user !== key) throw new Error('user mismatch');
-      allUserTags[key]       = data.tags || {};
+      allUserTagOps[key]     = normalizeTagOps(data.tagOps || data.tags, data.saved);
       allUserStates[key]     = data.states || {};
       allUserStatusTags[key] = Array.isArray(data.statusTags) ? data.statusTags : [];
       userFileMeta[key] = { present: true, saved: data.saved || null };
@@ -1357,33 +1458,34 @@ async function readDB() {
   // First run on this machine: build my own file from the legacy shared files
   if (!userFileMeta[currentUser].present) await migrateLegacyToMine();
 
-  // Aliases for my own data — all editing code works on these
-  db = {};
-  for (const [name, surahs] of Object.entries(allUserTags[currentUser] || {}))
-    db[name] = { surahs: Array.isArray(surahs) ? [...surahs] : [] };
   customStatusTags = [...(allUserStatusTags[currentUser] || [])];
+  computeMergedTags();
   renderSyncInfo();
 }
 
+// Every machine migrates the same shared tags.json, so each user starts with an
+// identical set of add-edits. That is harmless: they are byte-identical and carry
+// the same legacy timestamp, so any later real edit — by anyone — beats them all.
 async function migrateLegacyToMine() {
-  const tags = {};
+  const legacyTags = {};
   try {
     const legacy = (await readJSONFile('tags.json')).images || {};
     for (const [name, surahs] of Object.entries(legacy))
-      if (Array.isArray(surahs) && surahs.length) tags[name] = [...surahs];
+      if (Array.isArray(surahs) && surahs.length) legacyTags[name] = [...surahs];
   } catch {}
   let statusTags = [];
   try { statusTags = (await readJSONFile('status_tags.json')).tags || []; } catch {}
 
-  allUserTags[currentUser]       = tags;
+  allUserTagOps[currentUser]     = normalizeTagOps(legacyTags, LEGACY_TAG_TS);
   allUserStatusTags[currentUser] = Array.isArray(statusTags) ? statusTags : [];
-  allUserStates[currentUser]     = allUserStates[currentUser] || {};
+  allUserStates[currentUser]     = allUserStates[currentUser] || {};  // legacy states+units, loaded above
 
-  const hasData = Object.keys(tags).length || statusTags.length || Object.keys(allUserStates[currentUser]).length;
+  const hasData = Object.keys(allUserTagOps[currentUser]).length
+               || statusTags.length
+               || Object.keys(allUserStates[currentUser]).length;
   if (!isReadOnly() && hasData) {
-    db = {};
-    for (const [name, surahs] of Object.entries(tags)) db[name] = { surahs: [...surahs] };
     customStatusTags = [...allUserStatusTags[currentUser]];
+    computeMergedTags();
     await writeMyData();
     showToast(`تم إنشاء ملفك الخاص ${dataFileName(currentUser)} من الملفات القديمة ✓`);
   }
@@ -1392,25 +1494,26 @@ async function migrateLegacyToMine() {
 // The ONLY function that writes a data file on this machine — and only my own.
 async function writeMyData() {
   if (!currentUser || isReadOnly() || !dirHandle) return;
-  const tags = {};
-  for (const [name, m] of Object.entries(db))
-    if (m.surahs && m.surahs.length) tags[name] = m.surahs;
+  // Only MY tag edits are persisted — never the merged result, which would
+  // silently claim other users' edits as my own and defeat the merge.
+  const tagOps = {};
+  for (const [name, ops] of Object.entries(allUserTagOps[currentUser] || {}))
+    if (ops && Object.keys(ops).length) tagOps[name] = ops;
   const states = {};
   for (const [name, s] of Object.entries(allUserStates[currentUser] || {})) {
     if ((s.status && s.status !== 'none') || s.notes || s.units)
       states[name] = { status: s.status || 'none', notes: s.notes || '', units: s.units || 0 };
   }
   const payload = {
-    version: 3, app: 'pictool',
+    version: 4, app: 'pictool',
     user: currentUser, label: USERS[currentUser].label,
     saved: new Date().toISOString(),
-    tags, statusTags: customStatusTags, states,
+    tagOps, statusTags: customStatusTags, states,
   };
   const fh = await dirHandle.getFileHandle(dataFileName(currentUser), { create: true });
   const w  = await fh.createWritable();
   await w.write(JSON.stringify(payload, null, 2));
   await w.close();
-  allUserTags[currentUser]       = tags;
   allUserStatusTags[currentUser] = customStatusTags;
   userFileMeta[currentUser]      = { present: true, saved: payload.saved };
   renderSyncInfo();
@@ -1418,16 +1521,21 @@ async function writeMyData() {
 
 // Legacy entry points, all funneling into the single-writer file
 async function writeDB()           { await writeMyData(); }
-async function writeTagsDB()       { await writeMyData(); }
 async function writeStatesDB()     { await writeMyData(); }
 async function writeStatusTagsDB() { await writeMyData(); }
 
 // ═══════════════════════════════════════════════
 //  BACKUPS (backups/ subfolder, timestamped, never overwritten)
 // ═══════════════════════════════════════════════
+// Millisecond resolution is deliberate: at second resolution two snapshots taken
+// in the same second collide and the later silently overwrites the earlier — and
+// the whole point of backups is that nothing is ever silently overwritten. The
+// format keeps lexicographic order == chronological order, which backupMyFile()
+// and the versions list both rely on to find the newest snapshot.
 function backupTimestamp(d = new Date()) {
   const p = n => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}`;
+  const ms = String(d.getMilliseconds()).padStart(3, '0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}-${ms}`;
 }
 
 async function backupsDir() { return dirHandle.getDirectoryHandle('backups', { create: true }); }
@@ -1637,17 +1745,12 @@ function renderGrid() {
           ? `<div class="status-badge badge-${status}">${h(statusMeta(status).label)}</div>`
           : `<div class="status-badge" style="background:${statusMeta(status).color}">${h(statusMeta(status).label)}</div>`)
       : '';
+    const xChip = canEditTags()
+      ? (n) => `<span class="chip-x" onclick="event.stopPropagation();removeSurahTag(${JSON.stringify(name)},${n})" title="حذف هذه السورة">×</span>`
+      : () => '';
     const chips = surahs.length
-      ? surahs.map(n=>`<span class="surah-chip">${n}. ${SMAP.get(n)||''}<span class="chip-x" onclick="event.stopPropagation();removeSurahTag(${JSON.stringify(name)},${n})" title="حذف هذه السورة">×</span></span>`).join('')
+      ? surahs.map(n=>`<span class="surah-chip" title="${h(tagProvText(name, n))}">${n}. ${SMAP.get(n)||''}${xChip(n)}</span>`).join('')
       : `<span style="color:#ccc;font-size:10px">لا سور محددة</span>`;
-
-    const myTagSet = new Set(surahs);
-    const extraChips = Object.keys(USERS)
-      .filter(u => u !== currentUser && viewOthers.has(u))
-      .flatMap(u => ((allUserTags[u] || {})[name] || [])
-        .filter(s => !myTagSet.has(s))
-        .map(s => `<span class="surah-chip" style="border:1px dashed ${USERS[u].color};color:${USERS[u].color}" title="وسم ${USERS[u].label}">${s}. ${SMAP.get(s)||''}</span>`))
-      .join('');
 
     const noteHTML = notes ? `<div class="card-note" title="${h(notes)}">${h(notes)}</div>` : '';
 
@@ -1675,7 +1778,7 @@ function renderGrid() {
       ${badge}
       <div class="card-body">
         <div class="card-name" title="${h(name)}">${h(name)}</div>
-        <div class="card-tags">${chips}${extraChips}</div>${noteHTML}${otherRow}
+        <div class="card-tags">${chips}</div>${noteHTML}${otherRow}
       </div>`;
     attachLongPress(card, name);
     grid.appendChild(card);
@@ -1913,9 +2016,7 @@ async function ctxDelete() {
 // ── remove a single surah tag from a card ──
 async function removeSurahTag(name, surahNum) {
   if (!canEditTags()) return;
-  const surahs = ((db[name]||{}).surahs || []).filter(s => s !== surahNum);
-  db[name] = { surahs };
-  await writeDB();
+  await setTagOp(name, surahNum, TAG_DEL);
   applyFilters();
   showToast('تم حذف السورة');
 }
@@ -1963,7 +2064,7 @@ function closeModal() {
 async function saveImage() {
   if (!mFile) return;
   if (isReadOnly()) { showToast('وضع القراءة فقط — لا يُحفظ شيء'); closeModal(); return; }
-  if (canEditTags()) db[mFile] = { surahs: [...mSurahs] };
+  if (canEditTags()) await applyTagSet(mFile, mSurahs);
   setMyState(mFile, {
     status: mStatus,
     notes:  document.getElementById('modalNotes').value.trim(),
@@ -2299,8 +2400,7 @@ function updateQACount() {
 
 async function saveQA() {
   if (!qaFile || !canEditTags()) return;
-  db[qaFile] = { surahs: [...qaSurahs] };
-  await writeDB();
+  await applyTagSet(qaFile, qaSurahs);
   closeQA();
   applyFilters();
   showToast('تم الحفظ ✓');
@@ -2370,6 +2470,8 @@ function renderStats() {
   const repeated = allImages.filter(n => effectiveStatus(n) === 'repeated').length;
   const none     = allImages.filter(n => effectiveStatus(n) === 'none').length;
 
+  // Work units are always reported for every user, regardless of the display
+  // toggle — S in particular opens stats specifically to see A's and Z's totals.
   const userUnits = {};
   let totalUnits = 0;
   for (const u of Object.keys(USERS)) {
@@ -2890,13 +2992,9 @@ function renderViewOtherUsers() {
       const st = s?.status || 'none';
       const meta = st === 'none' ? { label: 'لم يُبدأ', color: '#475569' } : statusMeta(st);
       const units = s?.units ? `<span style="color:#94a3b8;margin-right:4px">(${s.units} وحدة)</span>` : '';
-      const uTags = (allUserTags[u] || {})[name] || [];
-      const tagsHtml = uTags.length
-        ? `<span style="color:#94a3b8;margin-right:4px;font-size:11px">📖 ${uTags.map(n => `${n}. ${SMAP.get(n) || ''}`).join('، ')}</span>`
-        : '';
       return `<span class="vm-user-status-item">
         <span class="vm-user-initial" style="background:${USERS[u].color}">${USERS[u].label}</span>
-        <span style="color:${meta.color}">${h(meta.label)}</span>${units}${tagsHtml}
+        <span style="color:${meta.color}">${h(meta.label)}</span>${units}
       </span>`;
     }).join('');
     bar.classList.remove('hidden');
@@ -3081,7 +3179,7 @@ async function openVersions() {
         const data = JSON.parse(await (await hnd.getFile()).text());
         if (data.user && USERS[data.user]) info.user = data.user;
         info.saved  = data.saved || null;
-        info.tags   = Object.keys(data.tags || {}).length;
+        info.tags   = Object.keys(data.tagOps || data.tags || {}).length;
         const sts   = Object.values(data.states || {});
         info.states = sts.filter(s => s.status && s.status !== 'none').length;
         info.notes  = sts.filter(s => s.notes).length;
@@ -3158,8 +3256,9 @@ function renderViewTagBar() {
   const q = (document.getElementById('viewTagInput')?.value || '').trim().toLowerCase();
 
   const xBtn = canEditTags() ? `<span class="vp-chip-x" onclick="event.stopPropagation();viewRemoveSurah(PLACEHOLDER)">×</span>` : '';
+  const vmName = vmCurrentName;
   document.getElementById('viewTagChips').innerHTML = vmSurahs.map(n =>
-    `<span class="vp-surah-chip-dark">${n}. ${SMAP.get(n)}${xBtn.replace('PLACEHOLDER', n)}</span>`
+    `<span class="vp-surah-chip-dark" title="${h(vmName ? tagProvText(vmName, n) : '')}">${n}. ${SMAP.get(n)}${xBtn.replace('PLACEHOLDER', n)}</span>`
   ).join('');
   document.getElementById('viewTagInput').style.display = canEditTags() ? '' : 'none';
 
@@ -3183,12 +3282,9 @@ function renderViewTagBar() {
 
 async function viewAddSurah(num) {
   if (!canEditTags()) return;
-  if (!vmSurahs.includes(num)) { vmSurahs.push(num); vmSurahs.sort((a, b) => a - b); }
   const name = vmCurrentName;
-  if (name) {
-    db[name] = { ...(db[name] || {}), surahs: [...vmSurahs] };
-    await writeTagsDB();
-  }
+  if (name) await setTagOp(name, num, TAG_ADD);
+  vmSurahs = name ? [...surahsFor(name)] : vmSurahs;
   document.getElementById('viewTagInput').value = '';
   renderViewTagBar();
   document.getElementById('viewTagInput').focus();
@@ -3196,12 +3292,9 @@ async function viewAddSurah(num) {
 
 async function viewRemoveSurah(num) {
   if (!canEditTags()) return;
-  vmSurahs = vmSurahs.filter(n => n !== num);
   const name = vmCurrentName;
-  if (name) {
-    db[name] = { ...(db[name] || {}), surahs: [...vmSurahs] };
-    await writeTagsDB();
-  }
+  if (name) await setTagOp(name, num, TAG_DEL);
+  vmSurahs = name ? [...surahsFor(name)] : vmSurahs.filter(n => n !== num);
   renderViewTagBar();
   document.getElementById('viewTagInput').focus();
 }

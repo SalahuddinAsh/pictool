@@ -65,6 +65,33 @@ DAILY USE
   after 3 days and red after 7, so stale data is never silent.
 
 
+CORRECTING A WRONG SURAH TAG
+────────────────────────────
+Surah tags are shared: a picture either contains a surah or it
+doesn't, so EITHER A or Z can fix a wrong tag, and the fix
+reaches the other person.
+
+How it works: the app remembers each tag change you make and
+when you made it. When files are exchanged, the most RECENT
+change for each picture+surah wins. So:
+
+  • Z removes a wrong surah on Tuesday. A imports Z's file →
+    the tag disappears for A too, even though A's own file
+    still had it.
+  • If A disagrees and re-adds it on Wednesday, that's newer,
+    so it comes back for both.
+
+Hover any tag to see who last changed it and when — so if a
+tag ever flips back, you can see who did it and talk about it.
+
+Importing an OLD file can never resurrect a deleted tag or
+undo a newer correction: old changes simply lose.
+
+Status, notes and work units are different — those are
+personal, and each person keeps their own. They are shown side
+by side, never merged.
+
+
 SHARING YOUR WORK WITH THE OTHERS
 ─────────────────────────────────
 1. You: click "📤 تصدير". This downloads your data file.
