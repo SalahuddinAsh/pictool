@@ -814,7 +814,7 @@ input[type=range].pen-size {
     <button class="btn btn-ghost" id="manageTagsBtn" onclick="openManageTags()">🏷 إدارة الوسوم</button>
     <button class="btn btn-ghost" id="reviewBtn" onclick="startReview()">🔍 مراجعة</button>
     <button class="btn btn-ghost" onclick="refreshImages()">↻ تحديث</button>
-    <button class="btn btn-ghost" id="exportBtn" onclick="exportMyData()">📤 تصدير</button>
+    <button class="btn btn-ghost" id="exportBtn" onclick="exportMyData()" title="إرسال ملف بياناتك للمستخدم الآخر">📤 إرسال بياناتي</button>
     <button class="btn btn-ghost" onclick="triggerImport()">📥 استيراد</button>
     <button class="btn btn-ghost" onclick="openVersions()">🕘 النسخ الاحتياطية</button>
     <button class="btn btn-ghost" onclick="openFolder()">تغيير المجلد</button>
@@ -3147,6 +3147,10 @@ function renderSyncInfo() {
 // ═══════════════════════════════════════════════
 //  EXPORT / IMPORT (identity lives INSIDE the file, never in its name)
 // ═══════════════════════════════════════════════
+// Hands the file to the OS share sheet (WhatsApp, Mail, AirDrop…) when the
+// browser supports sharing files, and falls back to a plain download otherwise.
+// The filename always carries who and when, so a file is identifiable even after
+// it has been forwarded around — though import trusts only the identity inside.
 async function exportMyData() {
   if (isReadOnly()) { showToast('وضع القراءة فقط — لا يوجد ملف لتصديره'); return; }
   await writeMyData();
@@ -3155,13 +3159,34 @@ async function exportMyData() {
     const fh = await dirHandle.getFileHandle(dataFileName(currentUser));
     text = await (await fh.getFile()).text();
   } catch { showToast('لا يوجد ملف بيانات بعد'); return; }
-  const blob = new Blob([text], { type: 'application/json' });
+
+  const fname = `${myLabel()}_data_${backupTimestamp()}.json`;
+  const file  = new File([text], fname, { type: 'application/json' });
+
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({
+        files: [file],
+        title: `بيانات ${USERS[currentUser].label} — بيكتول`,
+        text:  `بيانات ${USERS[currentUser].label} بتاريخ ${new Date().toLocaleString('ar-EG')}`,
+      });
+      showToast('تم الإرسال ✓');
+      return;
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;   // user closed the share sheet
+      // any other failure: fall through to download
+    }
+  }
+  downloadFile(file, fname);
+  showToast('تم تنزيل الملف — أرفقه في البريد أو واتساب 📤');
+}
+
+function downloadFile(blob, fname) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `${myLabel()}_data_${backupTimestamp()}.json`;
+  a.download = fname;
   a.click();
   URL.revokeObjectURL(a.href);
-  showToast('تم التصدير — أرسل الملف للمستخدم الآخر 📤');
 }
 
 function triggerImport() { document.getElementById('importFileInput').click(); }

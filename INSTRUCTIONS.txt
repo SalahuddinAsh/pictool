@@ -120,8 +120,13 @@ flagged what.
 
 SHARING YOUR WORK WITH THE OTHERS
 ─────────────────────────────────
-1. You: click "📤 تصدير". This downloads your data file.
-   Send it however you like (email, WhatsApp, Telegram…).
+1. You: click "📤 إرسال بياناتي".
+   Your system's share menu opens — pick WhatsApp, Mail,
+   AirDrop, or anything else, and send it straight to the
+   other person.
+   If your browser can't share files, the file is downloaded
+   instead and you attach it yourself. Either way the filename
+   says who it's from and when (e.g. a_data_2026-07-17_21-40-05-123.json).
 
 2. Them: click "📥 استيراد" and pick the file they received.
 
