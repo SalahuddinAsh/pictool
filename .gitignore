@@ -1,3 +1,13 @@
 .DS_Store
 .claude/
 node_modules/
+
+# Real user data stays out of this public repo — this is a PUBLIC repo and the
+# tool ships without any data. tests/fixtures-*.json are synthetic and safe;
+# anything matching these at the root is real tagging/state data.
+/tags*.json
+/*_states*.json
+/*_data*.json
+/status_tags*.json
+/data/
+/backups/

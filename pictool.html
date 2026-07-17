@@ -112,6 +112,13 @@ body {
   font-size: 12px; color: var(--muted);
   display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
 }
+.share-reminder {
+  padding: 9px 20px; font-size: 13px; font-weight: 600;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  background: #fef3c7; color: #92400e; border-bottom: 1px solid #fcd34d;
+}
+.share-reminder.overdue { background: #fee2e2; color: #991b1b; border-bottom-color: #fca5a5; }
+.share-reminder .sr-spacer { margin-inline-start: auto; }
 .stat-pill { display: inline-flex; align-items: center; gap: 4px; font-weight: 500; }
 .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
 
@@ -881,6 +888,15 @@ input[type=range].pen-size {
   </div>
 </div>
 
+<!-- ── SHARE REMINDER ── -->
+<div id="shareReminder" class="share-reminder hidden">
+  <span>📤</span>
+  <span id="shareReminderText"></span>
+  <span class="sr-spacer"></span>
+  <button class="btn btn-primary" onclick="exportMyData()">إرسال الآن</button>
+  <button class="btn btn-ghost" onclick="snoozeShareReminder()">ذكّرني بعد ٣ ساعات</button>
+</div>
+
 <!-- ── STATS BAR ── -->
 <div id="statsBar" class="statsbar hidden">
   <span id="statsText"></span>
@@ -1480,13 +1496,38 @@ function isReadOnly()  { return currentUser === 'c'; }
 function myLabel()     { return USERS[currentUser].label.toLowerCase(); }
 function dataFileName(userKey) { return `${USERS[userKey].label.toLowerCase()}_data.json`; }
 
+// A v2 overwrite could leave a shorter file's content followed by the tail of the
+// longer version it replaced, e.g. "...}\n}    60\n    ]\n  }\n}". JSON.parse rejects
+// the whole thing, and because every caller catches, the app silently showed ZERO
+// tags — 695 tagged pictures looking like none, with no error. Recovering the valid
+// prefix turns that silent, total loss into a visible, complete recovery.
+function parseJSONSalvaging(text, whatFor) {
+  try { return JSON.parse(text); } catch (e) {
+    let depth = 0, end = -1, inStr = false, esc = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (inStr) { if (esc) esc = false; else if (c === '\\') esc = true; else if (c === '"') inStr = false; continue; }
+      if (c === '"') { inStr = true; continue; }
+      if (c === '{' || c === '[') depth++;
+      else if (c === '}' || c === ']') { depth--; if (depth === 0) { end = i + 1; break; } }
+    }
+    if (end < 0) throw e;
+    const salvaged = JSON.parse(text.slice(0, end));   // throws if truly unusable
+    console.warn(`[pictool] salvaged ${whatFor || 'file'}: dropped ${text.length - end} trailing bytes`);
+    salvagedFiles.push(whatFor || 'file');
+    return salvaged;
+  }
+}
+let salvagedFiles = [];
+
 async function readJSONFile(name) {
   const fh = await dirHandle.getFileHandle(name);
-  return JSON.parse(await (await fh.getFile()).text());
+  return parseJSONSalvaging(await (await fh.getFile()).text(), name);
 }
 
 async function readDB() {
   db = {}; allUserStates = {}; allUserTagOps = {}; allUserStatusTagOps = {}; userFileMeta = {};
+  salvagedFiles = [];
   for (const key of Object.keys(USERS)) {
     userFileMeta[key] = { present: false, saved: null };
     try {
@@ -1517,6 +1558,8 @@ async function readDB() {
   computeMergedStatusTags();
   computeMergedTags();
   renderSyncInfo();
+  if (salvagedFiles.length)
+    showToast(`⚠️ تم إصلاح ملف تالف وقراءته بالكامل: ${[...new Set(salvagedFiles)].join('، ')}`, 8000);
 }
 
 // Every machine migrates the same shared tags.json, so each user starts with an
@@ -1571,7 +1614,9 @@ async function writeMyData() {
   await w.write(JSON.stringify(payload, null, 2));
   await w.close();
   userFileMeta[currentUser] = { present: true, saved: payload.saved };
+  markUnsharedChange();
   renderSyncInfo();
+  renderShareReminder();
 }
 
 // Legacy entry points, all funneling into the single-writer file
@@ -1657,6 +1702,11 @@ async function loadApp() {
   buildViewStatusButtons();
   applyFilters();
   updateUserSelector();
+  renderShareReminder();
+  // The app is often left open for days; re-check so the reminder appears
+  // without needing a reload.
+  clearInterval(shareReminderTimer);
+  shareReminderTimer = setInterval(renderShareReminder, 60 * 60 * 1000);
 }
 
 async function scanImages() {
@@ -2497,11 +2547,11 @@ function cap(s) { return s.charAt(0).toUpperCase()+s.slice(1); }
 function normalizeAr(s) { return s.replace(/[أإآٱ]/g, 'ا'); }
 
 let toastT;
-function showToast(msg) {
+function showToast(msg, ms = 2000) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('show');
   clearTimeout(toastT);
-  toastT = setTimeout(() => t.classList.remove('show'), 2000);
+  toastT = setTimeout(() => t.classList.remove('show'), ms);
 }
 
 // ═══════════════════════════════════════════════
@@ -3145,6 +3195,71 @@ function renderSyncInfo() {
 }
 
 // ═══════════════════════════════════════════════
+//  SHARE REMINDER
+//  Manual exchange is the one step v3 relies on a human to remember, and the
+//  cost of forgetting is silent: everyone else keeps working from stale data.
+//  So the reminder is driven by how long UNSHARED work has been sitting, not by
+//  a plain timer — it stays quiet when there is nothing to send, which is what
+//  keeps it worth reading rather than something to click past.
+// ═══════════════════════════════════════════════
+const SHARE_REMINDER_DAYS = 5;
+const SNOOZE_HOURS = 3;
+const DAY_MS = 86400000;
+let shareReminderTimer = null;
+
+function reminderKey(k) { return `pictool-${k}-${currentUser}`; }
+
+// Called after every successful write of my own file.
+function markUnsharedChange() {
+  if (!currentUser || isReadOnly()) return;
+  if (!localStorage.getItem(reminderKey('unshared-since')))
+    localStorage.setItem(reminderKey('unshared-since'), new Date().toISOString());
+}
+
+function markShared() {
+  if (!currentUser) return;
+  localStorage.removeItem(reminderKey('unshared-since'));
+  localStorage.removeItem(reminderKey('snooze-until'));
+  localStorage.setItem(reminderKey('last-shared'), new Date().toISOString());
+  renderShareReminder();
+}
+
+function unsharedDays() {
+  const since = localStorage.getItem(reminderKey('unshared-since'));
+  if (!since) return null;
+  const t = new Date(since).getTime();
+  if (!Number.isFinite(t)) return null;
+  return (Date.now() - t) / DAY_MS;
+}
+
+function shareReminderDue() {
+  if (!currentUser || isReadOnly()) return false;
+  const days = unsharedDays();
+  if (days === null || days < SHARE_REMINDER_DAYS) return false;
+  const snooze = localStorage.getItem(reminderKey('snooze-until'));
+  if (snooze && Date.now() < new Date(snooze).getTime()) return false;
+  return true;
+}
+
+function renderShareReminder() {
+  const bar = document.getElementById('shareReminder');
+  if (!bar || !currentUser) return;
+  const due = shareReminderDue();
+  bar.classList.toggle('hidden', !due);
+  if (!due) return;
+  const days = Math.floor(unsharedDays());
+  bar.classList.toggle('overdue', days >= SHARE_REMINDER_DAYS * 2);
+  document.getElementById('shareReminderText').textContent =
+    `مضى ${days} يوماً على تعديلات لم تُرسل — أرسل ملفك ليرى ${Object.entries(USERS)
+      .filter(([k]) => k !== currentUser).map(([, u]) => u.label).join(' و')} عملك الأحدث.`;
+}
+
+function snoozeShareReminder() {
+  localStorage.setItem(reminderKey('snooze-until'), new Date(Date.now() + SNOOZE_HOURS * 3600000).toISOString());
+  renderShareReminder();
+}
+
+// ═══════════════════════════════════════════════
 //  EXPORT / IMPORT (identity lives INSIDE the file, never in its name)
 // ═══════════════════════════════════════════════
 // Hands the file to the OS share sheet (WhatsApp, Mail, AirDrop…) when the
@@ -3170,6 +3285,7 @@ async function exportMyData() {
         title: `بيانات ${USERS[currentUser].label} — بيكتول`,
         text:  `بيانات ${USERS[currentUser].label} بتاريخ ${new Date().toLocaleString('ar-EG')}`,
       });
+      markShared();
       showToast('تم الإرسال ✓');
       return;
     } catch (e) {
@@ -3178,6 +3294,7 @@ async function exportMyData() {
     }
   }
   downloadFile(file, fname);
+  markShared();
   showToast('تم تنزيل الملف — أرفقه في البريد أو واتساب 📤');
 }
 
