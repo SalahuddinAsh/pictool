@@ -92,6 +92,32 @@ personal, and each person keeps their own. They are shown side
 by side, never merged.
 
 
+FLAGGING A PICTURE FOR THE OTHER PERSON
+───────────────────────────────────────
+To point the other person at pictures you both need to look at:
+
+1. Once, create a shared status tag for it:
+   "🏷 إدارة الوسوم" → add e.g. "للمناقشة" (needs discussion).
+   Status tags are shared, so it appears for BOTH of you after
+   the next file exchange — you only create it once.
+
+2. Mark the pictures with that status, and write a note saying
+   what you want (notes are personal, so yours is clearly
+   yours: "Z: هذه تحتاج مراجعة معك").
+
+3. Export and send your file. They import it.
+
+4. They then filter: "الحالة: للمناقشة" plus your letter under
+   "تصفية صور موسومة من:" — that lists exactly the pictures you
+   flagged, with your note visible on each.
+
+Note the difference: the status TAG (the vocabulary) is shared,
+but WHO marked WHICH picture is personal. So both of you can
+flag pictures independently and see each other's flags side by
+side — nothing is overwritten, and you can always tell who
+flagged what.
+
+
 SHARING YOUR WORK WITH THE OTHERS
 ─────────────────────────────────
 1. You: click "📤 تصدير". This downloads your data file.

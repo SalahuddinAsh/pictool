@@ -1196,7 +1196,11 @@ const BUILTIN_STATUSES = [
   { id: 'improve',  label: 'يحتاج تحسين',    color: '#ef4444' },
   { id: 'repeated', label: 'مكرر',           color: '#8b5cf6' },
 ];
-let customStatusTags = []; // [{ id, label, color }], loaded from status_tags.json
+// Merged ACTIVE vocabulary, recomputed from every user's edits. Which statuses
+// exist is shared truth (A and Z must be able to use and filter the same set);
+// which status a picture HAS stays per-user in allUserStates.
+let customStatusTags = []; // [{ id, label, color }]
+let statusTagDefs    = {}; // id → { label, color } for every tag ever defined
 
 function allStatusTags() { return [...BUILTIN_STATUSES, ...customStatusTags]; }
 function isBuiltinStatus(id) { return id === 'none' || BUILTIN_STATUSES.some(t => t.id === id); }
@@ -1204,17 +1208,19 @@ function statusMeta(id) {
   if (!id || id === 'none') return { id: 'none', label: 'لم يُبدأ', color: '#9ca3af' };
   const own = allStatusTags().find(t => t.id === id);
   if (own) return own;
-  for (const tags of Object.values(allUserStatusTags || {})) {
-    const t = (tags || []).find(x => x.id === id);
-    if (t) return t;
-  }
-  return { id, label: id, color: '#6b7280' };
+  // A tag can be retired from the vocabulary while pictures still carry it;
+  // keep rendering its real label rather than a raw id.
+  const def = statusTagDefs[id];
+  return def ? { id, label: def.label, color: def.color } : { id, label: id, color: '#6b7280' };
 }
+// Namespaced per user so two people inventing a tag at the same time cannot
+// mint the same id for different meanings.
 function nextCustomTagId() {
-  const nums = customStatusTags
-    .map(t => parseInt(String(t.id).replace('custom_', ''), 10))
+  const prefix = `custom_${currentUser}_`;
+  const nums = Object.keys(statusTagDefs)
+    .map(id => { const m = String(id).match(/^custom_[a-z]+_(\d+)$/); return m && id.startsWith(prefix) ? +m[1] : null; })
     .filter(n => Number.isFinite(n));
-  return 'custom_' + ((nums.length ? Math.max(...nums) : 0) + 1);
+  return prefix + ((nums.length ? Math.max(...nums) : 0) + 1);
 }
 function hexToRgba(hex, alpha) {
   const clean = (hex || '#6b7280').replace('#', '');
@@ -1269,9 +1275,8 @@ function setMyState(name, patch) {
 // across all users (done > partial > improve > repeated > custom tags > none)
 // rather than only the currently active user's own status.
 function effectiveStatus(name) {
-  const customIds = new Set(customStatusTags.map(t => t.id));
-  for (const u of visibleUsers())
-    for (const t of (allUserStatusTags[u] || [])) customIds.add(t.id);
+  // Retired vocabulary still ranks, since pictures may still carry those statuses.
+  const customIds = new Set([...customStatusTags.map(t => t.id), ...Object.keys(statusTagDefs)]);
   const order = ['done', 'partial', 'improve', 'repeated', ...customIds];
   for (const st of order) {
     if (visibleUsers().some(u => (getState(u, name).status || 'none') === st)) return st;
@@ -1327,10 +1332,61 @@ async function idbGet(k)   { const d=await idb(); return new Promise((res,rej)=>
 const TAG_ADD = 'a', TAG_DEL = 'd';
 const LEGACY_TAG_TS = '2000-01-01T00:00:00.000Z'; // any real edit must beat migrated data
 
-let allUserTagOps     = {};  // { userKey: { filename: { surahNum: { op, at } } } }
-let tagProv           = {};  // filename → { surahNum: { user, at, op } } — winning edit
-let allUserStatusTags = {};  // { userKey: [{id,label,color}] }
-let userFileMeta      = {};  // { userKey: { present, saved } }
+let allUserTagOps       = {};  // { userKey: { filename: { surahNum: { op, at } } } }
+let tagProv             = {};  // filename → { surahNum: { user, at, op } } — winning edit
+let allUserStatusTagOps = {};  // { userKey: { tagId: { op, at, label, color } } }
+let userFileMeta        = {};  // { userKey: { present, saved } }
+
+// Same last-writer-wins rule as surah tags, over the status vocabulary.
+function normalizeStatusTagOps(raw, fallbackTs) {
+  const out = {};
+  if (Array.isArray(raw)) {                       // legacy shared status_tags.json
+    for (const t of raw)
+      if (t && t.id) out[t.id] = { op: TAG_ADD, at: LEGACY_TAG_TS, label: t.label || t.id, color: t.color || '#6b7280' };
+    return out;
+  }
+  for (const [id, r] of Object.entries(raw || {})) {
+    if (!r || typeof r !== 'object') continue;
+    out[id] = {
+      op: r.op === TAG_DEL ? TAG_DEL : TAG_ADD,
+      at: typeof r.at === 'string' ? r.at : (fallbackTs || LEGACY_TAG_TS),
+      label: r.label || id, color: r.color || '#6b7280',
+    };
+  }
+  return out;
+}
+
+function computeMergedStatusTags() {
+  const winners = {};
+  statusTagDefs = {};
+  for (const [u, tags] of Object.entries(allUserStatusTagOps)) {
+    for (const [id, rec] of Object.entries(tags || {})) {
+      statusTagDefs[id] = { label: rec.label || id, color: rec.color || '#6b7280' };
+      const cur = winners[id];
+      if (!cur || tagOpWins(rec, u, cur)) winners[id] = { ...rec, user: u };
+    }
+  }
+  customStatusTags = Object.entries(winners)
+    .filter(([, w]) => w.op === TAG_ADD)
+    .map(([id, w]) => ({ id, label: w.label, color: w.color }));
+}
+
+function myStatusTagOps() {
+  if (!allUserStatusTagOps[currentUser]) allUserStatusTagOps[currentUser] = {};
+  return allUserStatusTagOps[currentUser];
+}
+
+async function setStatusTagOp(id, op, label, color) {
+  if (!canManage()) return;
+  const def = statusTagDefs[id] || {};
+  myStatusTagOps()[id] = {
+    op, at: new Date().toISOString(),
+    label: label ?? def.label ?? id,
+    color: color ?? def.color ?? '#6b7280',
+  };
+  computeMergedStatusTags();
+  await writeMyData();
+}
 
 // Accepts both the v3.1 edit format and the v3.0 plain {file: [surahs]} lists.
 function normalizeTagOps(raw, fallbackTs) {
@@ -1430,15 +1486,15 @@ async function readJSONFile(name) {
 }
 
 async function readDB() {
-  db = {}; allUserStates = {}; allUserTagOps = {}; allUserStatusTags = {}; userFileMeta = {};
+  db = {}; allUserStates = {}; allUserTagOps = {}; allUserStatusTagOps = {}; userFileMeta = {};
   for (const key of Object.keys(USERS)) {
     userFileMeta[key] = { present: false, saved: null };
     try {
       const data = await readJSONFile(dataFileName(key));
       if (data.user && data.user !== key) throw new Error('user mismatch');
-      allUserTagOps[key]     = normalizeTagOps(data.tagOps || data.tags, data.saved);
-      allUserStates[key]     = data.states || {};
-      allUserStatusTags[key] = Array.isArray(data.statusTags) ? data.statusTags : [];
+      allUserTagOps[key]       = normalizeTagOps(data.tagOps || data.tags, data.saved);
+      allUserStates[key]       = data.states || {};
+      allUserStatusTagOps[key] = normalizeStatusTagOps(data.statusTagOps || data.statusTags, data.saved);
       userFileMeta[key] = { present: true, saved: data.saved || null };
     } catch {}
   }
@@ -1458,7 +1514,7 @@ async function readDB() {
   // First run on this machine: build my own file from the legacy shared files
   if (!userFileMeta[currentUser].present) await migrateLegacyToMine();
 
-  customStatusTags = [...(allUserStatusTags[currentUser] || [])];
+  computeMergedStatusTags();
   computeMergedTags();
   renderSyncInfo();
 }
@@ -1476,15 +1532,15 @@ async function migrateLegacyToMine() {
   let statusTags = [];
   try { statusTags = (await readJSONFile('status_tags.json')).tags || []; } catch {}
 
-  allUserTagOps[currentUser]     = normalizeTagOps(legacyTags, LEGACY_TAG_TS);
-  allUserStatusTags[currentUser] = Array.isArray(statusTags) ? statusTags : [];
-  allUserStates[currentUser]     = allUserStates[currentUser] || {};  // legacy states+units, loaded above
+  allUserTagOps[currentUser]       = normalizeTagOps(legacyTags, LEGACY_TAG_TS);
+  allUserStatusTagOps[currentUser] = normalizeStatusTagOps(Array.isArray(statusTags) ? statusTags : [], LEGACY_TAG_TS);
+  allUserStates[currentUser]       = allUserStates[currentUser] || {};  // legacy states+units, loaded above
 
   const hasData = Object.keys(allUserTagOps[currentUser]).length
-               || statusTags.length
+               || Object.keys(allUserStatusTagOps[currentUser]).length
                || Object.keys(allUserStates[currentUser]).length;
   if (!isReadOnly() && hasData) {
-    customStatusTags = [...allUserStatusTags[currentUser]];
+    computeMergedStatusTags();
     computeMergedTags();
     await writeMyData();
     showToast(`تم إنشاء ملفك الخاص ${dataFileName(currentUser)} من الملفات القديمة ✓`);
@@ -1508,21 +1564,19 @@ async function writeMyData() {
     version: 4, app: 'pictool',
     user: currentUser, label: USERS[currentUser].label,
     saved: new Date().toISOString(),
-    tagOps, statusTags: customStatusTags, states,
+    tagOps, statusTagOps: allUserStatusTagOps[currentUser] || {}, states,
   };
   const fh = await dirHandle.getFileHandle(dataFileName(currentUser), { create: true });
   const w  = await fh.createWritable();
   await w.write(JSON.stringify(payload, null, 2));
   await w.close();
-  allUserStatusTags[currentUser] = customStatusTags;
-  userFileMeta[currentUser]      = { present: true, saved: payload.saved };
+  userFileMeta[currentUser] = { present: true, saved: payload.saved };
   renderSyncInfo();
 }
 
 // Legacy entry points, all funneling into the single-writer file
 async function writeDB()           { await writeMyData(); }
 async function writeStatesDB()     { await writeMyData(); }
-async function writeStatusTagsDB() { await writeMyData(); }
 
 // ═══════════════════════════════════════════════
 //  BACKUPS (backups/ subfolder, timestamped, never overwritten)
@@ -1843,8 +1897,7 @@ async function addCustomStatusTag() {
   if (label === 'لم يُبدأ' || allStatusTags().some(t => t.label === label)) {
     showToast('يوجد وسم بنفس الاسم بالفعل'); return;
   }
-  customStatusTags.push({ id: nextCustomTagId(), label, color: colorInp.value || '#6b7280' });
-  await writeStatusTagsDB();
+  await setStatusTagOp(nextCustomTagId(), TAG_ADD, label, colorInp.value || '#6b7280');
   labelInp.value = '';
   renderManageTags();
   renderStatusFilterOptions();
@@ -1856,9 +1909,8 @@ async function addCustomStatusTag() {
 async function removeCustomStatusTag(id) {
   const tag = customStatusTags.find(t => t.id === id);
   if (!tag) return;
-  if (!confirm(`حذف الوسم "${tag.label}"؟ لن تتغيّر حالة الصور الموسومة به حالياً، لكنه سيختفي من قوائم التصفية والوسم.`)) return;
-  customStatusTags = customStatusTags.filter(t => t.id !== id);
-  await writeStatusTagsDB();
+  if (!confirm(`حذف الوسم "${tag.label}"؟ لن تتغيّر حالة الصور الموسومة به حالياً، لكنه سيختفي من قوائم التصفية والوسم — لدى الجميع بعد تبادل الملفات.`)) return;
+  await setStatusTagOp(id, TAG_DEL);
   renderManageTags();
   renderStatusFilterOptions();
   buildViewStatusButtons();

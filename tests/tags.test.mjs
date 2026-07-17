@@ -42,7 +42,12 @@ test('migration preserves tags, status, notes and work units', async () => {
   assert.equal(mine.states['photo_1.jpg'].units, 3.5);
   assert.equal(mine.states['photo_1.jpg'].notes, 'ملاحظة A');
   assert.equal(mine.states['photo_1.jpg'].status, 'done');
-  assert.deepEqual(mine.statusTags, [{ id: 'custom_1', label: 'مراجعة', color: '#0ea5e9' }]);
+  // the legacy shared vocabulary became add-edits at the legacy timestamp,
+  // so every machine migrates identically and any real edit outranks it
+  assert.deepEqual(mine.statusTagOps, {
+    custom_1: { op: 'a', at: LEGACY, label: 'مراجعة', color: '#0ea5e9' },
+  });
+  assert.deepEqual(evj('customStatusTags'), [{ id: 'custom_1', label: 'مراجعة', color: '#0ea5e9' }]);
 
   // merged view shows the legacy tags
   assert.deepEqual(evj('surahsFor("photo_1.jpg")'), [2, 5]);
