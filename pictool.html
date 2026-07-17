@@ -119,6 +119,24 @@ body {
 }
 .share-reminder.overdue { background: #fee2e2; color: #991b1b; border-bottom-color: #fca5a5; }
 .share-reminder .sr-spacer { margin-inline-start: auto; }
+.ver-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.ver-hint { font-size: 12px; color: var(--muted); }
+.ver-table { width: 100%; border-collapse: collapse; }
+.ver-table th, .ver-table td { padding: 6px 10px; border-bottom: 1px solid var(--border); text-align: center; font-size: 12px; }
+.ver-table tr.ver-sel { background: rgba(37,99,235,.08); }
+.ver-diff { border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 12px; background: var(--surface2); max-height: 46vh; overflow-y: auto; }
+.diff-head { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; margin-bottom: 10px; flex-wrap: wrap; }
+.diff-from, .diff-to { direction: ltr; font-family: ui-monospace, monospace; background: rgba(0,0,0,.05); padding: 2px 6px; border-radius: 5px; }
+.diff-arrow { color: var(--muted); }
+.diff-sec { margin-bottom: 10px; }
+.diff-sec-title { font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+.diff-row { font-size: 11px; padding: 3px 6px; border-bottom: 1px dashed var(--border); display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.diff-file { direction: ltr; font-family: ui-monospace, monospace; color: var(--muted); }
+.diff-change { font-size: 11px; }
+.diff-add { color: #059669; font-weight: 600; }
+.diff-del { color: #dc2626; font-weight: 600; }
+.diff-chg { color: #d97706; }
+.diff-more { font-size: 11px; color: var(--muted); padding: 3px 6px; }
 .stat-pill { display: inline-flex; align-items: center; gap: 4px; font-weight: 500; }
 .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
 
@@ -806,7 +824,7 @@ input[type=range].pen-size {
 
 <!-- ── HEADER ── -->
 <div id="appHeader" class="header hidden">
-  <span class="logo">📖 بيكتول <span style="font-size:14px;font-weight:400;opacity:.5;letter-spacing:.02em">v3.1</span></span>
+  <span class="logo">📖 بيكتول <span style="font-size:14px;font-weight:400;opacity:.5;letter-spacing:.02em">v3.2</span></span>
   <span style="font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap">أنا:</span>
   <div class="user-sel">
     <button class="user-btn active" id="identityBadge" onclick="changeIdentity()" title="هويتك على هذا الجهاز — التغيير محمي"></button>
@@ -1617,6 +1635,7 @@ async function writeMyData() {
   markUnsharedChange();
   renderSyncInfo();
   renderShareReminder();
+  await maybePeriodicBackup();   // no-op unless 12h have passed
 }
 
 // Legacy entry points, all funneling into the single-writer file
@@ -1669,6 +1688,77 @@ async function backupMyFile() {
   await writeBackupFile(`${myLabel()}_${backupTimestamp()}.json`, text);
 }
 
+// "a_2026-07-17_21-40-05-123.json" / "import_z_..." → epoch ms, or null if the
+// name isn't one of ours. Anything unrecognised is never touched by pruning.
+const BACKUP_NAME_RE = /^(.*_)(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})-(\d{3})\.json$/;
+function parseBackupName(fname) {
+  const m = BACKUP_NAME_RE.exec(fname);
+  if (!m) return null;
+  const [, prefix, Y, Mo, D, h, mi, s, ms] = m;
+  return { prefix, t: new Date(+Y, +Mo - 1, +D, +h, +mi, +s, +ms).getTime() };
+}
+
+const BACKUP_RETENTION_DAYS = 30;
+const BACKUP_MIN_KEPT = 3;   // per stream, regardless of age
+const BACKUP_EVERY_MS = 12 * 3600 * 1000;   // twice a day
+
+// Backups are never deleted automatically. Deletion is the only irreversible
+// action in the tool, and a backup you didn't ask to lose is worth more than
+// the disk it occupies — so this only ever runs when a human clicks it, and
+// only after being shown exactly what would go.
+//
+// Safeguards that stay even then: filenames we don't recognise are never
+// touched (someone else's files may be in there), and the newest few per stream
+// always survive, so returning after a long break can't wipe every backup you
+// have — the exact opposite of what a backup is for.
+function backupsOlderThan(rows, days) {
+  const groups = {};
+  for (const r of rows) {
+    const p = parseBackupName(r.name);
+    if (!p) continue;                                  // unrecognised: never a candidate
+    (groups[p.prefix] ||= []).push({ name: r.name, t: p.t });
+  }
+  const cutoff = Date.now() - days * DAY_MS;
+  const out = [];
+  for (const list of Object.values(groups)) {
+    list.sort((a, b) => b.t - a.t);                    // newest first
+    for (const f of list.slice(BACKUP_MIN_KEPT))       // always keep the newest few
+      if (f.t < cutoff) out.push(f.name);
+  }
+  return out;
+}
+
+async function deleteOldBackups() {
+  const doomed = backupsOlderThan(versionRows, BACKUP_RETENTION_DAYS);
+  if (!doomed.length) { showToast(`لا توجد نسخ أقدم من ${BACKUP_RETENTION_DAYS} يوماً يمكن حذفها`); return; }
+  const preview = doomed.slice(0, 10).join('\n') + (doomed.length > 10 ? `\n… و ${doomed.length - 10} أخرى` : '');
+  if (!confirm(`حذف ${doomed.length} نسخة احتياطية أقدم من ${BACKUP_RETENTION_DAYS} يوماً؟\nهذا إجراء لا رجعة فيه.\n\n${preview}`)) return;
+  let deleted = 0;
+  try {
+    const bdir = await backupsDir();
+    for (const n of doomed) { await bdir.removeEntry(n); deleted++; }
+  } catch (e) { alert('تعذّر الحذف: ' + (e && e.message)); }
+  showToast(`تم حذف ${deleted} نسخة`);
+  await openVersions();
+}
+
+// Long sessions still get snapshots: back up if the newest one is over 12h old.
+async function maybePeriodicBackup() {
+  if (!currentUser || isReadOnly() || !dirHandle) return false;
+  let newest = 0;
+  try {
+    const bdir = await backupsDir();
+    for await (const [n, hnd] of bdir.entries()) {
+      if (hnd.kind !== 'file' || !n.startsWith(myLabel() + '_')) continue;
+      const p = parseBackupName(n);
+      if (p && p.t > newest) newest = p.t;
+    }
+  } catch { return false; }
+  if (newest && Date.now() - newest < BACKUP_EVERY_MS) return false;
+  await backupMyFile();
+  return true;
+}
+
 let reviewedSet = new Set();
 let reviewMode  = false;
 
@@ -1706,7 +1796,7 @@ async function loadApp() {
   // The app is often left open for days; re-check so the reminder appears
   // without needing a reload.
   clearInterval(shareReminderTimer);
-  shareReminderTimer = setInterval(renderShareReminder, 60 * 60 * 1000);
+  shareReminderTimer = setInterval(() => { renderShareReminder(); maybePeriodicBackup(); }, 60 * 60 * 1000);
 }
 
 async function scanImages() {
@@ -3354,64 +3444,240 @@ async function writeRawUserFile(user, data) {
 }
 
 // ═══════════════════════════════════════════════
+//  VERSION COMPARISON
+//  Restoring blind is how you trade one loss for another, so every restore
+//  should be answerable: "what exactly is different?" The data is structured,
+//  so this compares meaning (tags, statuses, notes, units, vocabulary) rather
+//  than text. Each side is read as a STANDALONE file — never merged with other
+//  users — because the question is what THIS file holds, not what the app shows.
+// ═══════════════════════════════════════════════
+function effectiveTagsOf(data) {
+  const ops = normalizeTagOps(data.tagOps || data.tags, data.saved);
+  const out = {};
+  for (const [name, rec] of Object.entries(ops)) {
+    const surahs = [];
+    for (const [sNum, r] of Object.entries(rec)) if (r.op === TAG_ADD) surahs.push(+sNum);
+    if (surahs.length) out[name] = surahs.sort((a, b) => a - b);
+  }
+  return out;
+}
+
+function vocabOf(data) {
+  const ops = normalizeStatusTagOps(data.statusTagOps || data.statusTags, data.saved);
+  const out = {};
+  for (const [id, r] of Object.entries(ops)) if (r.op === TAG_ADD) out[id] = r.label || id;
+  return out;
+}
+
+// oldD → newD. Returns plain data so it can be tested without the DOM.
+function diffVersions(oldD, newD) {
+  const d = { tagAdded: [], tagRemoved: [], stateAdded: [], stateRemoved: [], stateChanged: [], vocabAdded: [], vocabRemoved: [] };
+
+  const oT = effectiveTagsOf(oldD), nT = effectiveTagsOf(newD);
+  for (const f of new Set([...Object.keys(oT), ...Object.keys(nT)])) {
+    const a = new Set(oT[f] || []), b = new Set(nT[f] || []);
+    for (const s of b) if (!a.has(s)) d.tagAdded.push({ file: f, surah: s });
+    for (const s of a) if (!b.has(s)) d.tagRemoved.push({ file: f, surah: s });
+  }
+
+  const oS = oldD.states || {}, nS = newD.states || {};
+  for (const f of new Set([...Object.keys(oS), ...Object.keys(nS)])) {
+    const a = oS[f], b = nS[f];
+    if (!a && b) { d.stateAdded.push({ file: f, to: b }); continue; }
+    if (a && !b) { d.stateRemoved.push({ file: f, from: a }); continue; }
+    const changes = [];
+    if ((a.status || 'none') !== (b.status || 'none')) changes.push({ field: 'status', from: a.status || 'none', to: b.status || 'none' });
+    if ((a.notes || '') !== (b.notes || '')) changes.push({ field: 'notes', from: a.notes || '', to: b.notes || '' });
+    if ((+a.units || 0) !== (+b.units || 0)) changes.push({ field: 'units', from: +a.units || 0, to: +b.units || 0 });
+    if (changes.length) d.stateChanged.push({ file: f, changes });
+  }
+
+  const oV = vocabOf(oldD), nV = vocabOf(newD);
+  for (const [id, label] of Object.entries(nV)) if (!oV[id]) d.vocabAdded.push(label);
+  for (const [id, label] of Object.entries(oV)) if (!nV[id]) d.vocabRemoved.push(label);
+
+  d.isEmpty = !d.tagAdded.length && !d.tagRemoved.length && !d.stateAdded.length
+           && !d.stateRemoved.length && !d.stateChanged.length && !d.vocabAdded.length && !d.vocabRemoved.length;
+  return d;
+}
+
+const FIELD_AR = { status: 'الحالة', notes: 'الملاحظة', units: 'الوحدات' };
+function fieldValueAr(field, v) {
+  if (field === 'status') return statusMeta(v).label;
+  if (field === 'notes')  return v ? `"${v}"` : '(فارغة)';
+  return String(v);
+}
+
+function renderDiff(oldD, newD, oldLabel, newLabel) {
+  const d = diffVersions(oldD, newD);
+  if (d.isEmpty) return `<div class="dstats-empty">لا فرق بين النسختين — المحتوى متطابق.</div>`;
+
+  const cap = (arr, render, limit = 25) => {
+    const shown = arr.slice(0, limit).map(render).join('');
+    const rest  = arr.length > limit ? `<div class="diff-more">و ${arr.length - limit} أخرى…</div>` : '';
+    return shown + rest;
+  };
+  const sur = n => `${n}. ${SMAP.get(n) || ''}`;
+  const sec = (title, count, cls, body) => !count ? '' : `
+    <div class="diff-sec">
+      <div class="diff-sec-title ${cls}">${title} — ${count}</div>
+      ${body}
+    </div>`;
+
+  return `
+    <div class="diff-head">
+      <span class="diff-from">${h(oldLabel)}</span>
+      <span class="diff-arrow">←</span>
+      <span class="diff-to">${h(newLabel)}</span>
+    </div>
+    ${sec('سور مضافة', d.tagAdded.length, 'diff-add',
+        cap(d.tagAdded, x => `<div class="diff-row"><span class="diff-file">${h(x.file)}</span><span class="diff-add">+ ${sur(x.surah)}</span></div>`))}
+    ${sec('سور محذوفة', d.tagRemoved.length, 'diff-del',
+        cap(d.tagRemoved, x => `<div class="diff-row"><span class="diff-file">${h(x.file)}</span><span class="diff-del">− ${sur(x.surah)}</span></div>`))}
+    ${sec('صور تغيّرت', d.stateChanged.length, 'diff-chg',
+        cap(d.stateChanged, x => `<div class="diff-row"><span class="diff-file">${h(x.file)}</span>
+          ${x.changes.map(c => `<div class="diff-change">${FIELD_AR[c.field]}: <span class="diff-del">${h(fieldValueAr(c.field, c.from))}</span> ← <span class="diff-add">${h(fieldValueAr(c.field, c.to))}</span></div>`).join('')}
+        </div>`))}
+    ${sec('صور أُضيف لها عمل', d.stateAdded.length, 'diff-add',
+        cap(d.stateAdded, x => `<div class="diff-row"><span class="diff-file">${h(x.file)}</span>
+          <span class="diff-add">+ ${h(statusMeta(x.to.status).label)}${x.to.notes ? ` — "${h(x.to.notes)}"` : ''}${x.to.units ? ` — ${x.to.units} وحدة` : ''}</span></div>`))}
+    ${sec('صور فُقد عملها', d.stateRemoved.length, 'diff-del',
+        cap(d.stateRemoved, x => `<div class="diff-row"><span class="diff-file">${h(x.file)}</span>
+          <span class="diff-del">− ${h(statusMeta(x.from.status).label)}${x.from.notes ? ` — "${h(x.from.notes)}"` : ''}${x.from.units ? ` — ${x.from.units} وحدة` : ''}</span></div>`))}
+    ${sec('وسوم حالة مضافة', d.vocabAdded.length, 'diff-add',
+        cap(d.vocabAdded, l => `<div class="diff-row"><span class="diff-add">+ ${h(l)}</span></div>`))}
+    ${sec('وسوم حالة محذوفة', d.vocabRemoved.length, 'diff-del',
+        cap(d.vocabRemoved, l => `<div class="diff-row"><span class="diff-del">− ${h(l)}</span></div>`))}`;
+}
+
+// ═══════════════════════════════════════════════
 //  VERSIONS VIEWER + SAFE RESTORE
 // ═══════════════════════════════════════════════
 function closeVersions() { document.getElementById('versionsOverlay').classList.add('hidden'); }
 function onVersionsOverlayClick(e) { if (e.target.id === 'versionsOverlay') closeVersions(); }
 
+let versionRows = [];
+let versionSel  = [];
+
 async function openVersions() {
   const body = document.getElementById('versionsBody');
   body.innerHTML = '<div class="dstats-empty">جاري التحميل…</div>';
   document.getElementById('versionsOverlay').classList.remove('hidden');
-  const rows = [];
+  versionSel = [];
+  versionRows = [];
   try {
     const bdir = await backupsDir();
     for await (const [n, hnd] of bdir.entries()) {
       if (hnd.kind !== 'file' || !n.endsWith('.json')) continue;
-      const info = { name: n, user: null, saved: null, tags: 0, states: 0, notes: 0 };
+      const info = { name: n, user: null, saved: null, tags: 0, states: 0, notes: 0, units: 0 };
       try {
-        const data = JSON.parse(await (await hnd.getFile()).text());
+        const data = parseJSONSalvaging(await (await hnd.getFile()).text(), n);
         if (data.user && USERS[data.user]) info.user = data.user;
         info.saved  = data.saved || null;
         info.tags   = Object.keys(data.tagOps || data.tags || {}).length;
         const sts   = Object.values(data.states || {});
         info.states = sts.filter(s => s.status && s.status !== 'none').length;
         info.notes  = sts.filter(s => s.notes).length;
+        info.units  = sts.reduce((a, s) => a + (+s.units || 0), 0);
       } catch {}
-      rows.push(info);
+      versionRows.push(info);
     }
   } catch {}
-  rows.sort((a, b) => b.name.localeCompare(a.name));
-  if (!rows.length) { body.innerHTML = '<div class="dstats-empty">لا توجد نسخ احتياطية بعد</div>'; return; }
+  versionRows.sort((a, b) => b.name.localeCompare(a.name));
+  renderVersions();
+}
 
-  const td = 'padding:6px 10px;border-bottom:1px solid var(--border);text-align:center;font-size:12px';
+function toggleVersionSel(name) {
+  const i = versionSel.indexOf(name);
+  if (i >= 0) versionSel.splice(i, 1);
+  else { versionSel.push(name); if (versionSel.length > 2) versionSel.shift(); }
+  renderVersions();
+}
+
+function renderVersions() {
+  const body = document.getElementById('versionsBody');
+  if (!versionRows.length) { body.innerHTML = '<div class="dstats-empty">لا توجد نسخ احتياطية بعد</div>'; return; }
+
+  const hint = versionSel.length === 0 ? 'اختر نسخة لمقارنتها بالوضع الحالي، أو نسختين لمقارنتهما معاً.'
+             : versionSel.length === 1 ? 'مقارنة النسخة المحددة بالوضع الحالي — أو اختر نسخة ثانية.'
+             : 'مقارنة النسختين المحددتين.';
+  const old = backupsOlderThan(versionRows, BACKUP_RETENTION_DAYS).length;
+
   body.innerHTML = `
-    <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
+    <div class="ver-toolbar">
+      <button class="btn btn-primary" ${versionSel.length ? '' : 'disabled'} onclick="compareSelected()">⇄ قارن</button>
+      <span class="ver-hint">${hint}</span>
+      <span style="margin-inline-start:auto;font-size:11px;color:var(--muted)">${versionRows.length} نسخة — تُحفظ نسخة كل ١٢ ساعة</span>
+      ${old ? `<button class="btn btn-ghost" onclick="deleteOldBackups()" title="حذف يدوي — لا يُحذف شيء تلقائياً">🗑 حذف ${old} نسخة أقدم من ٣٠ يوماً</button>` : ''}
+    </div>
+    <div id="verDiffPanel" class="ver-diff hidden"></div>
+    <div style="overflow-x:auto"><table class="ver-table">
       <thead><tr>
-        <th style="${td}">الملف</th><th style="${td}">المستخدم</th><th style="${td}">تاريخ الحفظ</th>
-        <th style="${td}">سور</th><th style="${td}">حالات</th><th style="${td}">ملاحظات</th><th style="${td}"></th>
+        <th></th><th>الملف</th><th>المستخدم</th><th>تاريخ الحفظ</th>
+        <th>سور</th><th>حالات</th><th>ملاحظات</th><th>وحدات</th><th></th>
       </tr></thead>
-      <tbody>${rows.map(r => {
+      <tbody>${versionRows.map(r => {
         const u = r.user ? USERS[r.user] : null;
         const canRestore = r.user && (r.user !== currentUser || !isReadOnly());
-        return `<tr>
-          <td style="${td}" dir="ltr">${h(r.name)}</td>
-          <td style="${td}">${u ? `<span style="color:${u.color};font-weight:700">${u.label}</span>` : '؟'}</td>
-          <td style="${td}" dir="ltr">${r.saved ? new Date(r.saved).toLocaleString('ar-EG') : '—'}</td>
-          <td style="${td}">${r.tags}</td><td style="${td}">${r.states}</td><td style="${td}">${r.notes}</td>
-          <td style="${td}">${canRestore ? `<button class="btn btn-ghost" onclick="restoreVersion('${h(r.name)}')">↩ استعادة</button>` : ''}</td>
+        const sel = versionSel.includes(r.name);
+        return `<tr class="${sel ? 'ver-sel' : ''}">
+          <td><input type="checkbox" ${sel ? 'checked' : ''} onchange="toggleVersionSel(${JSON.stringify(r.name)})"></td>
+          <td dir="ltr">${h(r.name)}</td>
+          <td>${u ? `<span style="color:${u.color};font-weight:700">${u.label}</span>` : '؟'}</td>
+          <td dir="ltr">${r.saved ? new Date(r.saved).toLocaleString('ar-EG') : '—'}</td>
+          <td>${r.tags}</td><td>${r.states}</td><td>${r.notes}</td><td>${r.units || ''}</td>
+          <td>${canRestore ? `<button class="btn btn-ghost" onclick="restoreVersion(${JSON.stringify(r.name)})">↩ استعادة</button>` : ''}</td>
         </tr>`;
       }).join('')}</tbody>
     </table></div>
     <p style="font-size:12px;color:var(--muted);margin-top:10px">الاستعادة تأخذ نسخة احتياطية من الوضع الحالي أولاً — لا يمكن أن تفقد شيئاً بالاستعادة.</p>`;
 }
 
+async function readBackup(name) {
+  const bdir = await backupsDir();
+  return parseJSONSalvaging(await (await (await bdir.getFileHandle(name)).getFile()).text(), name);
+}
+
+async function compareSelected() {
+  const panel = document.getElementById('verDiffPanel');
+  if (!versionSel.length) return;
+  panel.classList.remove('hidden');
+  panel.innerHTML = '<div class="dstats-empty">جاري المقارنة…</div>';
+  try {
+    let oldD, newD, oldLabel, newLabel;
+    if (versionSel.length === 1) {
+      const v = await readBackup(versionSel[0]);
+      const who = v.user;
+      if (!who || !USERS[who]) { panel.innerHTML = '<div class="dstats-empty">نسخة بلا هوية — لا يمكن مقارنتها.</div>'; return; }
+      let cur;
+      try { cur = await readJSONFile(dataFileName(who)); }
+      catch { panel.innerHTML = `<div class="dstats-empty">لا يوجد ملف حالي للمستخدم ${USERS[who].label} للمقارنة به.</div>`; return; }
+      oldD = v; newD = cur;
+      oldLabel = `${versionSel[0]}`;
+      newLabel = `الوضع الحالي (${USERS[who].label})`;
+    } else {
+      const [x, y] = await Promise.all(versionSel.map(readBackup));
+      const [nx, ny] = versionSel;
+      const tx = parseBackupName(nx)?.t ?? 0, ty = parseBackupName(ny)?.t ?? 0;
+      const older = tx <= ty ? x : y, newer = tx <= ty ? y : x;
+      oldLabel = tx <= ty ? nx : ny;
+      newLabel = tx <= ty ? ny : nx;
+      if (older.user !== newer.user) {
+        panel.innerHTML = '<div class="dstats-empty">النسختان تخصّان مستخدمَين مختلفَين — المقارنة بلا معنى.</div>';
+        return;
+      }
+      oldD = older; newD = newer;
+    }
+    panel.innerHTML = renderDiff(oldD, newD, oldLabel, newLabel);
+  } catch (e) {
+    panel.innerHTML = `<div class="dstats-empty">تعذّرت المقارنة: ${h(String(e && e.message || e))}</div>`;
+  }
+}
+
 async function restoreVersion(fname) {
   let data;
-  try {
-    const bdir = await backupsDir();
-    data = JSON.parse(await (await (await bdir.getFileHandle(fname)).getFile()).text());
-  } catch { alert('تعذّرت قراءة النسخة'); return; }
+  try { data = await readBackup(fname); }
+  catch { alert('تعذّرت قراءة النسخة'); return; }
   const user = data.user;
   if (!user || !USERS[user]) { alert('نسخة غير صالحة (بدون هوية صاحبها)'); return; }
   const label = USERS[user].label;

@@ -147,9 +147,25 @@ BACKUPS AND VERSION HISTORY
 
 • Every file you import is archived there too.
 
+• A snapshot is also taken every 12 hours while you work, so
+  long sessions are covered too.
+
 • Click "🕘 النسخ الاحتياطية" to see every version with a
   summary (owner, save date, how many surahs / statuses /
-  notes it holds) and restore any of them.
+  notes / units it holds) and restore any of them.
+
+• COMPARING VERSIONS: tick one version to compare it with your
+  current data, or tick two to compare them with each other.
+  You get a readable list of what actually differs — surahs
+  added or removed, statuses and notes and units changed, work
+  gained or lost. Use this before restoring, so you always know
+  what you are about to change.
+
+• Backups are NEVER deleted automatically. When you want to
+  clear space, a button appears offering to delete versions
+  older than 30 days — it shows you exactly what would go and
+  asks first. The newest few are always kept, and files the
+  app doesn't recognise are never touched.
 
 • Restoring first backs up your current state, then swaps.
   So restoring can never lose anything either — including
